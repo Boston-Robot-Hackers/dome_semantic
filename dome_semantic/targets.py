@@ -31,8 +31,8 @@ class PotentialTarget:
     track_ids: set = field(default_factory=set)
     position_history: list = field(default_factory=list)  # list of (timestamp_s, xyz)
     size_mean: SizeEstimate | None = None
-    size_m2: float = 0.0   # running sum of squares for variance (Welford M2)
-    size_n: int = 0        # number of size observations
+    size_m2: float = 0.0  # running sum of squares for variance (Welford M2)
+    size_n: int = 0  # number of size observations
 
 
 @dataclass

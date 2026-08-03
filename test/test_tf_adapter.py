@@ -4,7 +4,10 @@
 # Open Source Under MIT license
 
 from unittest.mock import MagicMock
+
+import tf2_ros
 from geometry_msgs.msg import PointStamped
+
 from dome_semantic.tf_adapter import TFAdapter
 
 
@@ -59,7 +62,7 @@ def test_transform_uses_observation_stamp():
 
 def test_transform_returns_none_on_exception():
     buf = MagicMock()
-    buf.transform.side_effect = Exception("TF not available")
+    buf.transform.side_effect = tf2_ros.LookupException("TF not available")
     adapter = TFAdapter(buf, "camera_link", "map")
     assert adapter.transform((1.0, 0.0, 0.0), MagicMock()) is None
 

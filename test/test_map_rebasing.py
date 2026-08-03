@@ -94,16 +94,27 @@ def test_rebase_xyz_shifts_x_y_by_delta():
 
 def make_confirmed(xyz, history):
     return ConfirmedTarget(
-        target_id=1, label="can", canonical_class="can", xyz_world=xyz,
-        observation_count=3, confirmed_at_s=1.0, last_seen_s=2.0,
-        position_history=list(history), pos_welford_mean=xyz,
+        target_id=1,
+        label="can",
+        canonical_class="can",
+        xyz_world=xyz,
+        observation_count=3,
+        confirmed_at_s=1.0,
+        last_seen_s=2.0,
+        position_history=list(history),
+        pos_welford_mean=xyz,
     )
 
 
 def make_potential(xyz, history):
     return PotentialTarget(
-        target_id=2, label="cup", canonical_class="cup", xyz_world=xyz,
-        observation_count=1, first_seen_s=1.0, last_seen_s=1.0,
+        target_id=2,
+        label="cup",
+        canonical_class="cup",
+        xyz_world=xyz,
+        observation_count=1,
+        first_seen_s=1.0,
+        last_seen_s=1.0,
         position_history=list(history),
     )
 
@@ -142,9 +153,9 @@ def test_yaw_from_quaternion_identity():
 
 
 def test_yaw_from_quaternion_ninety_deg():
-    assert yaw_from_quaternion(math.sin(math.pi / 4), math.cos(math.pi / 4)) == pytest.approx(
-        math.pi / 2
-    )
+    assert yaw_from_quaternion(
+        math.sin(math.pi / 4), math.cos(math.pi / 4)
+    ) == pytest.approx(math.pi / 2)
 
 
 def test_rebase_tracker_identity_delta_is_noop():

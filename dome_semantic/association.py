@@ -4,7 +4,7 @@
 # Open Source Under MIT license
 
 from dome_semantic.size_estimate import SizeEstimate
-from dome_semantic.targets import ConfirmedTarget, Observation, PotentialTarget
+from dome_semantic.targets import ConfirmedTarget, Observation
 from dome_semantic.tracker_config import WorldTrackerConfig
 
 
@@ -41,9 +41,14 @@ class TargetAssociator:
             if t.canonical_class != obs.label:
                 continue
             d = self.euclidean(obs.xyz, t.xyz_world)
-            if obs.track_id is not None and obs.track_id in t.track_ids and d <= strict * 2 and d < best_dist:
-                best, best_dist = t, d
-            elif d <= strict and d < best_dist:
+            if (
+                obs.track_id is not None
+                and obs.track_id in t.track_ids
+                and d <= strict * 2
+                and d < best_dist
+                or d <= strict
+                and d < best_dist
+            ):
                 best, best_dist = t, d
         return best
 
@@ -75,9 +80,12 @@ class TargetAssociator:
             if t.canonical_class != obs.label:
                 continue
             d = self.euclidean(obs.xyz, t.xyz_world)
-            if d > strict:
-                if not (obs.track_id is not None and obs.track_id in t.track_ids and d <= strict * 2):
-                    continue
+            if d > strict and not (
+                obs.track_id is not None
+                and obs.track_id in t.track_ids
+                and d <= strict * 2
+            ):
+                continue
             cost = self.pasa_cost(obs, t)
             if cost < best_p_cost:
                 best_p_cost, best_p = cost, t
@@ -125,22 +133,42 @@ class TargetAssociator:
         dist_norm = dist / max(cfg.max_assoc_dist_m, 1e-6)
 
         size_norm = 0.0
-        if cfg.assoc_cost_size_weight > 0 and obs.size_est is not None and target.size_mean is not None:
-            if obs.size_est.depth_quality >= cfg.size_confidence_floor:
-                size_dev = abs(obs.size_est.width_m - target.size_mean.width_m)
-                profile = self.profiles.get(target.canonical_class)
-                if profile is not None:
-                    diam_range = profile.diameter_range_m[1] - profile.diameter_range_m[0]
-                    size_norm = size_dev / max(diam_range, 1e-4)
-                else:
-                    size_norm = size_dev / max(target.size_mean.width_m, 1e-4)
+        if (
+            cfg.assoc_cost_size_weight > 0
+            and obs.size_est is not None
+            and target.size_mean is not None
+            and obs.size_est.depth_quality >= cfg.size_confidence_floor
+        ):
+            size_dev = abs(obs.size_est.width_m - target.size_mean.width_m)
+            profile = self.profiles.get(target.canonical_class)
+            if profile is not None:
+                diam_range = profile.diameter_range_m[1] - profile.diameter_range_m[0]
+                size_norm = size_dev / max(diam_range, 1e-4)
+            else:
+                size_norm = size_dev / max(target.size_mean.width_m, 1e-4)
 
-        stat = self.stationarity_cost(target) if cfg.assoc_cost_stationary_weight > 0 else 0.0
-        hint = 1.0 if obs.track_id is not None and obs.track_id in getattr(target, "track_ids", set()) else 0.0
+        stat = (
+            self.stationarity_cost(target)
+            if cfg.assoc_cost_stationary_weight > 0
+            else 0.0
+        )
+        hint = (
+            1.0
+            if obs.track_id is not None
+            and obs.track_id in getattr(target, "track_ids", set())
+            else 0.0
+        )
 
-        return {"dist_norm": dist_norm, "size_norm": size_norm, "stat": stat, "hint": hint}
+        return {
+            "dist_norm": dist_norm,
+            "size_norm": size_norm,
+            "stat": stat,
+            "hint": hint,
+        }
 
-    def size_check_fails(self, size_est: "SizeEstimate | None", target: ConfirmedTarget) -> bool:
+    def size_check_fails(
+        self, size_est: "SizeEstimate | None", target: ConfirmedTarget
+    ) -> bool:
         if size_est is None or target.size_mean is None:
             return False
         if size_est.depth_quality < self.config.size_confidence_floor:
@@ -170,4 +198,4 @@ class TargetAssociator:
         return True
 
     def euclidean(self, a, b) -> float:
-        return ((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2) ** 0.5
+        return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2) ** 0.5

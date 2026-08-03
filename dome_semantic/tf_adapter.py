@@ -2,13 +2,22 @@
 # tf_adapter — transforms 3D points between TF frames using an injected tf2 Buffer
 # Author: Pito Salas and Claude Code
 # Open Source Under MIT license
-#
-# Ported from dome_vision_ros (F33 T03), targeting `map` instead of `odom`
-# (F33 G1: map is the frame of record). One behavior change from the
-# original: the transform lookup now uses the observation's own stamp
-# instead of time-zero/"latest available" - F33 G1 calls for transforming
-# "at observation time", and using the real stamp is what that means.
 
+"""Point transform adapter, ported from dome_vision_ros (F33 T03).
+
+Retargeted to `map` instead of `odom` (F33 G1: map is the frame of record).
+Two behavior changes from the original: (1) the transform lookup now uses
+the observation's own stamp instead of time-zero/"latest available" - F33
+G1 calls for transforming "at observation time", and using the real stamp
+is what that means. (2) the original caught a blind `except Exception`;
+narrowed here to the three tf2 exceptions this codebase already catches
+everywhere else a TF lookup can fail (see dome_nav's explorer_manager_node.py,
+this package's own semantic_map_node.py) - a genuine bug elsewhere in this
+method should still surface instead of being silently mapped to "transform
+unavailable".
+"""
+
+import tf2_ros
 from geometry_msgs.msg import PointStamped
 
 
@@ -36,5 +45,9 @@ class TFAdapter:
         try:
             result = self.tf_buffer.transform(point, self.target_frame)
             return (result.point.x, result.point.y, result.point.z)
-        except Exception:
+        except (
+            tf2_ros.LookupException,
+            tf2_ros.ConnectivityException,
+            tf2_ros.ExtrapolationException,
+        ):
             return None

@@ -9,7 +9,11 @@ import json
 import numpy as np
 
 from dome_semantic.association import TargetAssociator
-from dome_semantic.class_profiles import build_label_map, load_class_profiles, parse_class_profiles
+from dome_semantic.class_profiles import (
+    build_label_map,
+    load_class_profiles,
+    parse_class_profiles,
+)
 from dome_semantic.embedding_similarity import cosine_sim
 from dome_semantic.size_estimate import SizeEstimate
 from dome_semantic.targets import ConfirmedTarget, Observation, PotentialTarget
@@ -67,7 +71,9 @@ class WorldTracker:
         for raw in observations:
             obs = self.to_obs(raw)
             canonical = self.label_map.get(obs.label, obs.label)
-            resolved = Observation(obs.xyz, canonical, obs.frame_num, obs.track_id, obs.size_est)
+            resolved = Observation(
+                obs.xyz, canonical, obs.frame_num, obs.track_id, obs.size_est
+            )
             t = self.assoc.find_false_split(resolved, self.confirmed, timestamp_s)
             if t is None:
                 continue
@@ -80,10 +86,14 @@ class WorldTracker:
             self.trim_pos_history(t)
             recovered_ids.add(id(raw))
             if self.config.use_class_profiles:
-                self.assoc_log.append({
-                    "xyz": list(obs.xyz), "label": obs.label,
-                    "outcome": "recovered", "target_id": t.target_id,
-                })
+                self.assoc_log.append(
+                    {
+                        "xyz": list(obs.xyz),
+                        "label": obs.label,
+                        "outcome": "recovered",
+                        "target_id": t.target_id,
+                    }
+                )
         return [o for o in observations if id(o) not in recovered_ids]
 
     @property
@@ -105,7 +115,9 @@ class WorldTracker:
         for raw in observations:
             obs = self.to_obs(raw)
             canonical = self.label_map.get(obs.label, obs.label)
-            resolved = Observation(obs.xyz, canonical, obs.frame_num, obs.track_id, obs.size_est)
+            resolved = Observation(
+                obs.xyz, canonical, obs.frame_num, obs.track_id, obs.size_est
+            )
             target = self.assoc.find_match(resolved, self.confirmed, self.potentials)
             if self.config.use_class_profiles:
                 entry: dict = {"xyz": list(obs.xyz), "label": obs.label}
@@ -117,9 +129,18 @@ class WorldTracker:
                     entry["costs"] = self.assoc.pasa_cost_breakdown(resolved, target)
                 self.assoc_log.append(entry)
             if target is None:
-                self.create_potential(obs.xyz, obs.label, canonical, timestamp_s, obs.track_id, obs.size_est)
+                self.create_potential(
+                    obs.xyz,
+                    obs.label,
+                    canonical,
+                    timestamp_s,
+                    obs.track_id,
+                    obs.size_est,
+                )
             else:
-                self.update_target(target, obs.xyz, timestamp_s, obs.track_id, obs.size_est)
+                self.update_target(
+                    target, obs.xyz, timestamp_s, obs.track_id, obs.size_est
+                )
 
     def to_obs(self, raw) -> Observation:
         if isinstance(raw, Observation):
@@ -129,7 +150,9 @@ class WorldTracker:
         size_est = rest[1] if len(rest) > 1 else None
         return Observation(xyz, label, frame_num, track_id, size_est)
 
-    def create_potential(self, xyz, label, canonical, timestamp_s, track_id, size_est) -> None:
+    def create_potential(
+        self, xyz, label, canonical, timestamp_s, track_id, size_est
+    ) -> None:
         t = PotentialTarget(
             target_id=self.next_id,
             label=label,
@@ -148,7 +171,9 @@ class WorldTracker:
         self.next_id += 1
 
     def update_target(self, target, xyz, timestamp_s, track_id, size_est) -> None:
-        target.xyz_world = self.running_mean(target.xyz_world, target.observation_count, xyz)
+        target.xyz_world = self.running_mean(
+            target.xyz_world, target.observation_count, xyz
+        )
         target.observation_count += 1
         target.last_seen_s = timestamp_s
         if track_id is not None:
@@ -162,31 +187,40 @@ class WorldTracker:
 
     def promote(self, observations: list, timestamp_s: float) -> None:
         obs_labels = {self.to_obs(o).label for o in observations}
-        confirmed_this_frame = {t.label for t in self.confirmed if t.label in obs_labels and not t.is_lost}
+        confirmed_this_frame = {
+            t.label for t in self.confirmed if t.label in obs_labels and not t.is_lost
+        }
         ready = [
-            p for p in self.potentials
+            p
+            for p in self.potentials
             if p.observation_count >= self.config.min_frames
             and (p.last_seen_s - p.first_seen_s) >= self.config.min_time_s
         ]
         for p in ready:
             # skip the anchor gate on first-ever confirmation — no confirmed targets exist yet to co-observe
-            if self.config.require_anchor and self.has_confirmed and not confirmed_this_frame:
+            if (
+                self.config.require_anchor
+                and self.has_confirmed
+                and not confirmed_this_frame
+            ):
                 continue
             self.potentials.remove(p)
-            self.confirmed.append(ConfirmedTarget(
-                target_id=p.target_id,
-                label=p.label,
-                canonical_class=p.canonical_class,
-                xyz_world=p.xyz_world,
-                observation_count=p.observation_count,
-                confirmed_at_s=timestamp_s,
-                last_seen_s=p.last_seen_s,
-                track_ids=set(p.track_ids),
-                position_history=list(p.position_history),
-                size_mean=p.size_mean,
-                size_m2=p.size_m2,
-                size_n=p.size_n,
-            ))
+            self.confirmed.append(
+                ConfirmedTarget(
+                    target_id=p.target_id,
+                    label=p.label,
+                    canonical_class=p.canonical_class,
+                    xyz_world=p.xyz_world,
+                    observation_count=p.observation_count,
+                    confirmed_at_s=timestamp_s,
+                    last_seen_s=p.last_seen_s,
+                    track_ids=set(p.track_ids),
+                    position_history=list(p.position_history),
+                    size_mean=p.size_mean,
+                    size_m2=p.size_m2,
+                    size_n=p.size_n,
+                )
+            )
             self.has_confirmed = True
 
     def expire(self, timestamp_s: float) -> None:
@@ -196,11 +230,15 @@ class WorldTracker:
             elif t.is_lost:
                 t.is_lost = False
         self.confirmed = [
-            t for t in self.confirmed
-            if not (t.is_lost and timestamp_s - t.last_seen_s > self.config.remove_timeout_s)
+            t
+            for t in self.confirmed
+            if not (
+                t.is_lost and timestamp_s - t.last_seen_s > self.config.remove_timeout_s
+            )
         ]
         self.potentials = [
-            p for p in self.potentials
+            p
+            for p in self.potentials
             if timestamp_s - p.last_seen_s <= self.config.lost_timeout_s
         ]
 
@@ -208,7 +246,9 @@ class WorldTracker:
         if not target.position_history:
             return
         cutoff = target.position_history[-1][0] - self.config.stationary_window_s
-        target.position_history = [(t, x) for t, x in target.position_history if t >= cutoff]
+        target.position_history = [
+            (t, x) for t, x in target.position_history if t >= cutoff
+        ]
 
     def welford_update_position(self, target: ConfirmedTarget, xyz: tuple) -> None:
         target.pos_n += 1
@@ -216,7 +256,9 @@ class WorldTracker:
         old_mean = target.pos_welford_mean
         new_mean = tuple(old_mean[i] + (xyz[i] - old_mean[i]) / n for i in range(3))
         target.pos_welford_mean = new_mean
-        target.pos_m2 += sum((xyz[i] - old_mean[i]) * (xyz[i] - new_mean[i]) for i in range(3))
+        target.pos_m2 += sum(
+            (xyz[i] - old_mean[i]) * (xyz[i] - new_mean[i]) for i in range(3)
+        )
         target.position_variance = target.pos_m2 / (n - 1) if n >= 2 else 0.0
         target.is_converged = (
             n >= self.config.convergence_min_obs
@@ -235,7 +277,9 @@ class WorldTracker:
         prev_mean_h = target.size_mean.height_m
         new_mean_w = prev_mean_w + (new_est.width_m - prev_mean_w) / n
         new_mean_h = prev_mean_h + (new_est.height_m - prev_mean_h) / n
-        target.size_m2 += (new_est.width_m - prev_mean_w) * (new_est.width_m - new_mean_w)
+        target.size_m2 += (new_est.width_m - prev_mean_w) * (
+            new_est.width_m - new_mean_w
+        )
         target.size_mean = SizeEstimate(
             width_m=new_mean_w,
             height_m=new_mean_h,
@@ -269,7 +313,9 @@ class WorldTracker:
                 "last_seen_s": t.last_seen_s,
                 "embedding": base64.b64encode(
                     t.embedding.astype(np.float32).tobytes()
-                ).decode() if t.embedding is not None else None,
+                ).decode()
+                if t.embedding is not None
+                else None,
             }
             entries.append(entry)
         return json.dumps(entries)
@@ -322,5 +368,7 @@ class WorldTracker:
     def running_mean(self, current, n, new_val):
         alpha = self.config.position_ema_alpha
         if alpha > 0.0:
-            return tuple(alpha * new_val[i] + (1.0 - alpha) * current[i] for i in range(3))
+            return tuple(
+                alpha * new_val[i] + (1.0 - alpha) * current[i] for i in range(3)
+            )
         return tuple((current[i] * n + new_val[i]) / (n + 1) for i in range(3))

@@ -69,7 +69,11 @@ def pixel_to_xyz(
 ) -> tuple[float, float, float] | None:
     if intrinsics is None or depth_m is None or depth_m <= 0:
         return None
-    intr = intrinsics if isinstance(intrinsics, Intrinsics) else Intrinsics.from_tuple(intrinsics)
+    intr = (
+        intrinsics
+        if isinstance(intrinsics, Intrinsics)
+        else Intrinsics.from_tuple(intrinsics)
+    )
     return (
         (pixel_x - intr.cx) * depth_m / intr.fx,
         (pixel_y - intr.cy) * depth_m / intr.fy,
