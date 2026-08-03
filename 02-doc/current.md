@@ -16,7 +16,41 @@
   targets -> `/semantic/targets` + `/targets/markers`. The user launches each
   piece themselves; verification is interactive (checking topics/TF/markers
   as each piece comes up), not a scripted procedure — don't build tooling for
-  this, just check it live.
+  this, just check it live. **This VM cannot do this verification itself**:
+  no OAK-D hardware present (confirmed via `lsusb`) and no SSH path to the
+  robot Pi is documented anywhere in the workspace — this only works run
+  directly on the robot, which is the whole reason for the restart.
+
+  **Per-component launch (real robot, no combined launch exists)**:
+  - Drivers (odom, static TF chain incl. `camera_link`): `bl dome2
+    robot.launch.py --options "drivers"`
+  - OAK-D detection *only* — do **not** use `--options vision` here, that
+    also starts `dome_vision_ros`'s own legacy `semantic_map_node` (the one
+    F33 replaces) alongside the camera:
+    `bl dome_vision_ros dome_vision_ros.launch.py --config
+    dome_vision/dome_vision_ros/config/roboflow_oak.yaml --depth true`
+    (no default `--config`, must be passed explicitly). Gotcha: the node only
+    publishes `/oak/detections_3d` once something has subscribed to it
+    (`get_subscription_count() > 0` gate) — a bare `ros2 topic hz
+    /oak/detections_3d` counts and will "unstick" it.
+  - SLAM (`map`->`odom`): `bl dome_nav robot_map.launch.py --map_name <name>`
+    (SLAM only, no Nav2/explorer — use this over `robot_explore.launch.py`
+    for isolated testing)
+  - `dome_semantic`'s node — no launch file exists for it, `ros2 run` only:
+    `ros2 run dome_semantic semantic_map_node --ros-args -p
+    map_name:=<name> -p publish_every_n:=5`
+
+  **Diagnostic checks at each step** (existing repo conventions, not new
+  tooling):
+  - TF chain the node actually needs: `ros2 run tf2_ros tf2_echo map
+    camera_link` (note: `ros2diag`'s `r2tfcheck` predefined pairs do *not*
+    include `camera_link`, so this one has to be manual)
+  - `ros2 topic hz /oak/detections_3d`, `/semantic/targets`,
+    `/targets/markers`
+  - `ros2 topic echo /semantic/targets` for content, `/targets/assoc_diag`
+    if `use_class_profiles` is on
+  - On node shutdown, check the persisted file matches what was seen live:
+    `~/.dome/semantic_maps/<map_name>.json`
 - **T07 (fake detection producer) — designed, deferred.** Full design exists
   (a pure `fake_scenario.py` scenario model — object list + Gaussian noise +
   seeded dropout — plus a `tools/fake_detections.py` live publisher mirroring
