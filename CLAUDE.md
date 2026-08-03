@@ -4,9 +4,13 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 Read and follow all rules in the `.claude/` folder:
 - `.claude/process.md` — development workflow and feature/task tracking rules
-- `.claude/style_guide.md` — coding standards, style rules, and review checklist
-- `02-doc/current.md` — session handoff and current status
+- `02-doc/current.md` — session handoff; only the `## Open` section matters for
+  new work, see `02-doc/history.md` for the completed-work log
 - `02-doc/notes.md` — semi-permanent project notes
+
+Before writing or reviewing code, read and follow `.claude/style_guide.md`
+(coding standards, style rules, and review checklist) — apply it yourself
+before committing; do not substitute a generic/plugin review for it.
 
 We are developing dome_semantic, the semantic map for the DOME robot (F33).
 It tracks confirmed object targets (two-tier confirmation, label-constrained
@@ -18,6 +22,17 @@ and TF — `dome_nav` never depends on it and vice versa.
 Literate docs are in `01-literate/`, project docs are in `02-doc/`, features are
 in `03-features/`, tasks are in `04-tasks/`, issues are in `05-issues/`, and the
 spec is in `02-doc/spec.md`.
+
+## Agent model selection
+
+Default subagent dispatches to haiku; upgrade only when the task needs
+judgment, not just data-gathering:
+- **haiku** — file/log discovery, "where is X defined", dependency-closure
+  scans, counting, formatting. Use the `Explore` agent type for this.
+- **sonnet** — analysis, code review, writing, moderate reasoning, synthesis
+  across subagent findings.
+- **opus** — architecture decisions, novel debugging, cross-cutting design
+  tradeoffs.
 
 ## Sibling packages
 
