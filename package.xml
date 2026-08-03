@@ -12,6 +12,11 @@
   <maintainer email="pitosalas@gmail.com">pitosalas</maintainer>
   <license>MIT</license>
 
+  <depend>rclpy</depend>
+  <depend>tf2_ros</depend>
+  <depend>geometry_msgs</depend>
+  <depend>vision_msgs</depend>
+
   <test_depend>python3-pytest</test_depend>
 
   <export>

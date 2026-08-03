@@ -17,6 +17,8 @@ setup(
     description="Semantic map (confirmed object tracking) for the DOME robot.",
     license="MIT",
     entry_points={
-        "console_scripts": [],
+        "console_scripts": [
+            "semantic_map_node = dome_semantic.semantic_map_node:main",
+        ],
     },
 )

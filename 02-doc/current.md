@@ -22,6 +22,15 @@
   `examples/configs/class_profiles.yaml` fixture file alongside the code.
   `dome_vision`'s originals were **not** deleted — cleanup is deferred until
   the ROS shell (T03/T04) is proven, same pattern F35/TF35 T06 used.
+- **TF33 T03** — `map`-frame recording + re-basing on `map→odom` jumps. Not a
+  port this time — nothing like it existed anywhere; `dome_vision`'s current
+  node only transforms camera→`odom` and has no re-basing at all. New:
+  `tf_adapter.py` (ported `TFAdapter`, retargeted to `map`, now uses the
+  detection's real stamp instead of the original's ignored one),
+  `map_rebasing.py` (pure SE(2) transform composition + `rebase_tracker`),
+  and this package's first ROS node, `semantic_map_node.py` (subscribes
+  `/oak/detections_3d`, TF-transforms + re-bases; no publishing yet — that's
+  T04). 110 tests pass total; `colcon build` clean.
 
 ## Open
 
@@ -31,9 +40,8 @@
   relocate-with-the-code pattern F35 used (moved at T08, once the extraction
   was complete), not relocated on day one. This package has no `.md` task
   records of its own yet.
-- **T03** — `map`-frame recording + re-basing on SLAM `map→odom` jumps: not
-  started.
-- **T04** — typed `SemanticTargetArray` publishing + node wiring (this
-  package's first ROS node): not started.
+- **T04** — typed `SemanticTargetArray` publishing + node wiring (params,
+  `/targets/markers`, `/targets/assoc_diag`, `/describe_scene`): not started.
+  Builds directly on T03's `semantic_map_node.py`.
 - **T06–T10** — persistence, fake-detection sim tool, sub-stack launch
   integration, Pi CPU measurement, docs: not started.
