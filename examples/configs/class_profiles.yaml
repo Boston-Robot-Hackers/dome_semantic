@@ -1,0 +1,28 @@
+class_profiles:
+
+  - canonical_class: soda can
+    abbrev: CN
+    detector_labels: ["can"]
+    height_range_m: [0.115, 0.130]
+    diameter_range_m: [0.060, 0.068]
+    aspect_ratio_range: [1.7, 2.1]
+    max_stationary_speed_mps: 0.02
+    size_confidence_floor: 0.5
+    depth_noise_scale: 1.0
+    merge_radius_m: 0.10
+    # How close (metres) a re-observation must be to merge with a confirmed target.
+    # For known-stationary objects this equals expected sensor noise, not odometry drift.
+    drift_tolerance_m: 0.15
+
+  - canonical_class: coffee cup
+    abbrev: CP
+    detector_labels: ["cup"]
+    height_range_m: [0.085, 0.120]
+    diameter_range_m: [0.075, 0.095]
+    aspect_ratio_range: [0.9, 1.5]
+    max_stationary_speed_mps: 0.02
+    size_confidence_floor: 0.5
+    depth_noise_scale: 1.2
+    merge_radius_m: 0.12
+    # Slightly larger than can due to higher depth noise on curved/shiny surfaces.
+    drift_tolerance_m: 0.20
