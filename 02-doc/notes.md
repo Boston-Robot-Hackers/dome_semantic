@@ -28,14 +28,15 @@ exactly the modules ported here (`world_tracker.py`, `targets.py`,
 
 **Why this matters here**: F33's stated intent is a one-way migration —
 *"dome_vision keeps OAK/depth/detection publishing; the map/tracker moves"*
-(TF33 T02). Once this package's own ROS node (T03/T04) is built and proven,
+(TF33.2). Once this package's own ROS node (TF33.3/TF33.4) is built and
+proven,
 `dome_vision`'s `semantic_map_node.py` gets retired and its
 `world_tracker.py`/`association.py`/etc. get deleted. At that point these
 four features become moot *in dome_vision* (their target file will be gone).
 If the underlying improvements are still wanted, they'd need to be
 re-authored against `dome_semantic`'s own structure — not silently assumed
 to carry over, since by then this package's modules may already differ
-(T03's map-frame re-basing, T04's typed publishing).
+(TF33.3's map-frame re-basing, TF33.4's typed publishing).
 
 **How to apply**: before deleting `dome_vision`'s originals, check whether
 F39/F40/F56/F57 landed there in the meantime — if any did, decide then

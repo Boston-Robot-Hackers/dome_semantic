@@ -16,6 +16,7 @@
 # tasks
 * Full task list before any design/code. `TFNN-<slug>.md` (`NN` matches the feature) in `04-tasks/{notdone,done,deferred}/`; `template.md` shows the format.
 * Each step is numbered `TFNN.N`, matching the file's own `TFNN` (e.g. `TF03.0`, `TF03.1`, ...), starting at `.0` — not a bare `T0N`.
+* Soft caps: a step's body <= 30 lines, a TF file <= 150 lines. Beyond that, split the step into two, move procedural detail (commands, diagnostics) to `02-doc/current.md`/`notes.md` with the step pointing at it, or split remaining scope into a new phase/task file.
 * Every step gets a test where feasible (else record why); every feature gets a dedicated test-writing task.
 * Task lists must never include a "regenerate literate docs" task — literate docs are refreshed later, at checkpoint, not as part of a feature's task list.
 * Last task done → move the task file to `done/`, set the feature's Done/Tests Written/Test Passing to yes, move the feature file to `done/`.

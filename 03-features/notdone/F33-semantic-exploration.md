@@ -49,13 +49,14 @@ feature implements the integration it describes.
   (2026-07-31). High-level sequencing (`explore` / `locate targets` /
   `go to target`) and the `/intent` contract move out of dome_nav into a new
   neutral `dome_mission` package, **extracted in Phase A** (see F35). Effect on
-  this feature: the typed-msg consumer (**T05** below) moves to dome_mission —
-  label→pose resolution lives there, and **dome_nav never depends on
-  `dome_semantic_msgs`**. dome_nav becomes navigation primitives only. This also
-  resolves the G3 open question (where dwell/sequencing lives: dome_mission,
-  not the explorer node FSM / algorithm plugin / Nav2 BT). TF33 T05 is
-  superseded by the F35 task file; keep the G2 contract bug fix (typed msg
-  replacing schemaless JSON) but its consumer is dome_mission.
+  this feature: the typed-msg consumer (**TF33.5** below) moves to
+  dome_mission — label→pose resolution lives there, and **dome_nav never
+  depends on `dome_semantic_msgs`**. dome_nav becomes navigation primitives
+  only. This also resolves the G3 open question (where dwell/sequencing
+  lives: dome_mission, not the explorer node FSM / algorithm plugin / Nav2
+  BT). TF33.5 is superseded by the F35 task file; keep the G2 contract bug
+  fix (typed msg replacing schemaless JSON) but its consumer is
+  dome_mission.
 
 ## Phasing (per analysis.md recommendation sketch)
 
