@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-08-03"
+version: "1.1"
+generated: "2026-10-22"
 ---
 
 # `semantic_map_node.py` — Where Detections Become a Typed, Shareable Map
@@ -228,7 +228,7 @@ def main() -> None:
     rclpy.init()
     node = SemanticMapNode()
     try:
-        rclpy.spin(node)
+        rclpy.spin(node, executor=rclpy.executors.MultiThreadedExecutor())
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
     finally:
@@ -237,6 +237,13 @@ def main() -> None:
         if rclpy.ok():
             rclpy.shutdown()
 ```
+
+**Why a `MultiThreadedExecutor`**: `TFAdapter` waits up to 0.2 s inside
+`on_detections` for the detection stamp's transform to arrive. That only
+works if TF messages keep being delivered during the wait, which needs a
+second thread — the `TransformListener`'s reentrant callback group supplies
+the permission, the multi-threaded executor supplies the thread. See
+`08-tf_adapter.md`.
 
 `node.save()` — a one-line wrapper around `semantic_persistence.save_semantic_map`
 — runs in `main`'s `finally`, so it fires on a clean shutdown *and* on

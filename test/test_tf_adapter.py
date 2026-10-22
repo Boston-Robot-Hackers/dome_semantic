@@ -3,6 +3,7 @@
 # Author: Pito Salas and Claude Code
 # Open Source Under MIT license
 
+import threading
 from unittest.mock import MagicMock
 
 import tf2_ros
@@ -79,14 +80,33 @@ def test_custom_frames_respected():
     assert target == "map"
 
 
-def test_transform_with_real_buffer():
-    """A real Buffer needs tf2_geometry_msgs loaded to transform PointStamped."""
-    buf = tf2_ros.Buffer()
+def make_camera_in_map(stamp: Time) -> TransformStamped:
     camera_in_map = TransformStamped()
     camera_in_map.header.frame_id = "map"
+    camera_in_map.header.stamp = stamp
     camera_in_map.child_frame_id = "camera_link"
     camera_in_map.transform.translation.x = 1.0
     camera_in_map.transform.rotation.w = 1.0
-    buf.set_transform_static(camera_in_map, "test")
+    return camera_in_map
+
+
+def test_transform_with_real_buffer():
+    """A real Buffer needs tf2_geometry_msgs loaded to transform PointStamped."""
+    buf = tf2_ros.Buffer()
+    buf.set_transform_static(make_camera_in_map(Time()), "test")
     adapter = TFAdapter(buf, "camera_link", "map")
     assert adapter.transform((0.5, 0.0, 0.2), Time()) == (1.5, 0.0, 0.2)
+
+
+def test_transform_waits_for_lagging_tf():
+    """Odometry TF arrives after the detection stamped at the same instant."""
+    buf = tf2_ros.Buffer()
+    stamp = Time(sec=100)
+    buf.set_transform(make_camera_in_map(Time(sec=99)), "test")
+    late_arrival = threading.Timer(
+        0.05, buf.set_transform, (make_camera_in_map(stamp), "test")
+    )
+    late_arrival.start()
+    adapter = TFAdapter(buf, "camera_link", "map")
+    assert adapter.transform((0.5, 0.0, 0.2), stamp) == (1.5, 0.0, 0.2)
+    late_arrival.join()

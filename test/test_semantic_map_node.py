@@ -5,6 +5,8 @@
 
 import json
 import math
+import threading
+import time
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -13,7 +15,9 @@ import tf2_ros
 from builtin_interfaces.msg import Time as RosTime
 from geometry_msgs.msg import Point, TransformStamped
 from std_msgs.msg import Header
+from rclpy.executors import MultiThreadedExecutor
 from std_srvs.srv import Trigger
+from tf2_msgs.msg import TFMessage
 from vision_msgs.msg import (
     BoundingBox3D,
     Detection3D,
@@ -25,9 +29,12 @@ from dome_semantic.map_rebasing import PlanarTransform
 from dome_semantic.targets import ConfirmedTarget
 
 
+TEST_DOMAIN_ID = 87  # keeps test traffic off a live robot's graph
+
+
 @pytest.fixture(scope="module", autouse=True)
 def ros():
-    rclpy.init()
+    rclpy.init(domain_id=TEST_DOMAIN_ID)
     yield
     rclpy.shutdown()
 
@@ -336,3 +343,47 @@ def test_maybe_rebase_seeds_baseline_without_rebasing_on_first_call(node):
 
     assert target.xyz_world == pytest.approx((5.0, 5.0, 1.0))
     assert node.last_map_t_odom == PlanarTransform(9.0, 9.0, pytest.approx(1.0))
+
+
+def wait_until(condition, timeout_s: float) -> bool:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if condition():
+            return True
+        time.sleep(0.01)
+    return False
+
+
+def test_detection_waits_for_tf_arriving_after_it():
+    """Odometry TF lags detection stamps on the robot; on_detections must be
+    able to wait for it, so TF callbacks have to run while it blocks.
+    """
+    from dome_semantic.semantic_map_node import SemanticMapNode
+
+    node = SemanticMapNode()
+    source = rclpy.create_node("tf_and_detection_source")
+    tf_pub = source.create_publisher(TFMessage, "/tf", 10)
+    det_pub = source.create_publisher(Detection3DArray, "/oak/detections_3d", 10)
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
+    spinner = threading.Thread(target=executor.spin)
+    spinner.start()
+    try:
+        assert wait_until(
+            lambda: tf_pub.get_subscription_count() > 0
+            and det_pub.get_subscription_count() > 0,
+            5.0,
+        )
+        det_pub.publish(make_detections([(0.0, 0.0, 1.0, "cup", None)], sec=100))
+        time.sleep(0.05)
+        camera_in_map = make_transform_stamped(x=1.0)
+        camera_in_map.header.frame_id = "map"
+        camera_in_map.header.stamp = RosTime(sec=100)
+        camera_in_map.child_frame_id = "camera_link"
+        tf_pub.publish(TFMessage(transforms=[camera_in_map]))
+        assert wait_until(lambda: node.tracker.potentials, 2.0)
+    finally:
+        executor.shutdown()
+        spinner.join()
+        source.destroy_node()
+        node.destroy_node()

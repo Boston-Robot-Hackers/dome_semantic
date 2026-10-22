@@ -39,7 +39,7 @@ dome_nav** — dome_nav must never gain a `dome_semantic_msgs` dependency.
 
 ## TF33.0 — Real-hardware verification: test the stack bottom-up
 
-**Status**: not started — the actual next step, ahead of TF33.7/TF33.8
+**Status**: in progress — run notes in `02-doc/current.md`
 
 TF33.1–TF33.6 are done but only unit-tested — never run against real OAK-D
 hardware. No combined launch exists yet (that's TF33.8), so verification is
@@ -52,7 +52,8 @@ a scripted procedure — don't build tooling for it, just check it live. Must
 run directly on the robot (confirmed 2026-08-27: OAK-D present via `lsusb`).
 
 **1. Drivers** (odom, static TF chain incl. `camera_link`):
-`bl dome2 robot.launch.py --options "drivers"`
+`bl dome2 robot.launch.py --options "d b"` (drivers + battery; battery
+telemetry is its own subsystem now)
 
 **2. OAK-D detection only** — do **not** use `--options vision` (that also
 starts `dome_vision_ros`'s legacy `semantic_map_node`, the one F33 replaces):
@@ -69,14 +70,17 @@ publishes `/oak/detections_3d` once something has subscribed
 Check: `ros2 topic hz /oak/detections_3d`.
 
 **3. SLAM** (`map`→`odom`):
-`bl dome_nav robot_map.launch.py --map_name <name>` (SLAM only, no
-Nav2/explorer — use this over `robot_explore.launch.py` for isolated
-testing).
+`ros2 launch slam_toolbox online_async_launch.py
+slam_params_file:=$HOME/ros2_ws/src/dome_nav/config/mapper_params_online_async.yaml`
+(SLAM without Nav2 — `robot_map.launch.py` also brings up Nav2). For a
+no-SLAM check, a static identity `map`→`odom` works:
+`ros2 run tf2_ros static_transform_publisher --frame-id map
+--child-frame-id odom` (skips re-basing).
 Check: `ros2 run tf2_ros tf2_echo map camera_link` — not in `ros2diag`'s
 `r2tfcheck` predefined pairs, so this one is manual.
 
 **4. dome_semantic node** — no launch file exists yet (TF33.8), `ros2 run`
-only:
+only, from `~/ros2_ws` (from the package dir it reports "Package not found"):
 `ros2 run dome_semantic semantic_map_node --ros-args -p map_name:=<name> -p
 publish_every_n:=5`
 Check: `ros2 topic hz /semantic/targets`, `/targets/markers`; `ros2 topic

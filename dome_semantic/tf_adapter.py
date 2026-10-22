@@ -15,11 +15,20 @@ everywhere else a TF lookup can fail (see dome_nav's explorer_manager_node.py,
 this package's own semantic_map_node.py) - a genuine bug elsewhere in this
 method should still surface instead of being silently mapped to "transform
 unavailable".
+
+The lookup waits up to TF_WAIT_S for the stamp's transform: detections are
+stamped ~2 ms before arrival but odometry TF lags 10-150 ms, so a zero-wait
+lookup at the observation stamp always extrapolates into the future. The
+wait polls the buffer from the calling callback, so the owning node must spin
+in a MultiThreadedExecutor for TF callbacks to keep landing meanwhile.
 """
 
 import tf2_geometry_msgs  # noqa: F401  registers PointStamped with tf2
 import tf2_ros
 from geometry_msgs.msg import PointStamped
+from rclpy.duration import Duration
+
+TF_WAIT_S = 0.2
 
 
 class TFAdapter:
@@ -44,7 +53,9 @@ class TFAdapter:
         point.point.y = float(xyz[1])
         point.point.z = float(xyz[2])
         try:
-            result = self.tf_buffer.transform(point, self.target_frame)
+            result = self.tf_buffer.transform(
+                point, self.target_frame, timeout=Duration(seconds=TF_WAIT_S)
+            )
             return (result.point.x, result.point.y, result.point.z)
         except (
             tf2_ros.LookupException,

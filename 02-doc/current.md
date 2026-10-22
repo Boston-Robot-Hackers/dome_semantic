@@ -4,8 +4,9 @@
 
 ## Open
 
-- **Repo state**: `dome_semantic` committed and pushed 2026-10-22 (includes
-  the `tf2_geometry_msgs` fix below).
+- **Repo state**: `tf2_geometry_msgs` fix committed and pushed 2026-10-22.
+  The TF-wait fix (below) and TF33.0 doc fixes are committed, not pushed;
+  all 130 tests pass.
 - **Next actual step: TF33.0, real-hardware verification** (see task file for
   the full bottom-up procedure and per-component launch/diagnostic commands).
   TF33.1-TF33.6 are done (msgs, tracker port, map-frame TF + re-basing, typed
@@ -75,14 +76,19 @@
 - **Not yet verified**: node running stable after the fix, confirmed targets
   on `/semantic/targets` with an object in view, persisted JSON on shutdown.
   Only empty `/oak/detections_3d` arrays were sampled so far.
+- **Second bug found and fixed**: every detection was dropped
+  as a TF extrapolation error — odometry TF lags 10-150 ms behind detection
+  stamps, and the lookup used zero wait. `tf_adapter.py` now waits up to
+  0.2 s, and the node spins in a `MultiThreadedExecutor` (the TF listener's
+  own reentrant callback group keeps receiving while a callback waits).
+  Regression test added (chores.md). Not yet re-run on the robot.
 
-### Doc errors to fix (chore, not yet done)
+### Doc errors — fixed in the TF33.0 task file
 
-- TF33.0 step 3 says `robot_map.launch.py` is "SLAM only, no Nav2" — wrong,
-  it includes `nav2_bringup navigation_launch.py`. For SLAM without Nav2, run
-  `ros2 launch slam_toolbox online_async_launch.py` with
-  `dome_nav/config/mapper_params_online_async.yaml` directly.
-- TF33.0 step 1 should be `--options "d b"` (only noted here so far).
+- Step 1 is now `--options "d b"`; step 3 now uses slam_toolbox's
+  `online_async_launch.py` directly (`robot_map.launch.py` also starts Nav2),
+  with the static identity `map→odom` as the no-SLAM option; step 4 notes
+  running from `~/ros2_ws`.
 
 ### Telemetry plotting
 

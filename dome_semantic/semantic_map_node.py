@@ -273,7 +273,8 @@ def main() -> None:
     rclpy.init()
     node = SemanticMapNode()
     try:
-        rclpy.spin(node)
+        # Multi-threaded so TF keeps arriving while on_detections waits for it.
+        rclpy.spin(node, executor=rclpy.executors.MultiThreadedExecutor())
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
     finally:

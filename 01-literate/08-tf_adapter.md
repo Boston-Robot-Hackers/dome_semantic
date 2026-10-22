@@ -1,5 +1,5 @@
 ---
-version: "1.1"
+version: "1.2"
 generated: "2026-10-22"
 ---
 
@@ -21,7 +21,9 @@ def transform(self, xyz: tuple, stamp) -> "tuple[float, float, float] | None":
     point.header.stamp = stamp
     point.point.x, point.point.y, point.point.z = xyz
     try:
-        result = self.tf_buffer.transform(point, self.target_frame)
+        result = self.tf_buffer.transform(
+            point, self.target_frame, timeout=Duration(seconds=TF_WAIT_S)
+        )
         return (result.point.x, result.point.y, result.point.z)
     except (
         tf2_ros.LookupException,
@@ -75,6 +77,29 @@ this port takes the message's own `stamp` and passes it straight through to
 existed at that specific instant, not whatever tf2 happens to have cached
 most recently.
 
+## Waiting briefly for a transform that hasn't arrived yet
+
+Asking for the transform *at the detection's stamp* has a timing catch.
+Detections are stamped ~2 ms before they arrive, but odometry TF lags
+**10-150 ms** behind. A zero-wait lookup therefore always asked for a time
+slightly *past* the newest transform in the buffer, raised
+`ExtrapolationException`, and **every detection was dropped** — found on the
+second real-robot run (TF33.0).
+
+The fix is a bounded wait, `TF_WAIT_S = 0.2`: `Buffer.transform` polls until
+the stamp's transform lands or the timeout expires.
+
+- **Why 0.2 s**: comfortably above the observed worst-case lag, yet short
+  next to the ~10 fps detection rate's tolerance for a stale callback.
+- **The concurrency precondition**: the wait blocks inside the detection
+  callback, so TF messages must keep being delivered *meanwhile*. The node
+  spins in a `MultiThreadedExecutor`, and `TransformListener` subscribes in
+  its own `ReentrantCallbackGroup`, so TF callbacks run on another thread
+  while `on_detections` waits. Under a single-threaded executor the wait
+  would always time out.
+- **The guard** is a late-arriving-TF regression test: the transform is
+  added to a real buffer from another thread after the lookup has begun.
+
 ## Why the exception handling was narrowed
 
 The original also caught a blind `except Exception`. This port catches
@@ -101,7 +126,7 @@ transform," which would make the bug much harder to notice.
   going.** `SemanticMapNode.on_detections` counts drops and logs a single
   throttled warning if *every* detection in a message was dropped, rather
   than warning once per dropped point — see `13-semantic_map_node.md`.
-- **This adapter has no retry or buffering of its own.** A single missed
+- **This adapter has no retry or buffering beyond the 0.2 s wait.** A single missed
   transform on one detection is just gone — there's no "try again next
   tick with the same point," because by next tick there's a new detection
   anyway. This is a fire-and-forget-per-observation design, consistent with
