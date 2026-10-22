@@ -17,6 +17,7 @@ method should still surface instead of being silently mapped to "transform
 unavailable".
 """
 
+import tf2_geometry_msgs  # noqa: F401  registers PointStamped with tf2
 import tf2_ros
 from geometry_msgs.msg import PointStamped
 

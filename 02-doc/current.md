@@ -1,11 +1,11 @@
 # Current status
 
-**2026-08-03** — see `02-doc/history.md` for the completed-work log.
+**2026-10-22** — see `02-doc/history.md` for the completed-work log.
 
 ## Open
 
-- **Repo state**: `dome_semantic`, `dome_nav`, and `~/j3` are all committed
-  and pushed to `origin/main` as of today. Nothing pending, nothing staged.
+- **Repo state**: `dome_semantic` committed and pushed 2026-10-22 (includes
+  the `tf2_geometry_msgs` fix below).
 - **Next actual step: TF33.0, real-hardware verification** (see task file for
   the full bottom-up procedure and per-component launch/diagnostic commands).
   TF33.1-TF33.6 are done (msgs, tracker port, map-frame TF + re-basing, typed
@@ -25,8 +25,75 @@
   docs: not started. TF33.5 superseded by F35 (consumer is `dome_mission`,
   not this package).
 
+## TF33.0 progress — 2026-10-21
+
+### Power: brownouts on the robot
+
+- **The robot crashed during the previous TF33.0 attempt** (boot ended
+  11:24:29). The kernel log shows repeated `Undervoltage detected!` starting
+  ~40 s after the OAK-D enumerated, ending on an undervoltage line with no
+  shutdown — a brownout, not a software crash.
+- **Still dipping this boot**: 6 undervoltage events 11:30–11:43, and
+  `vcgencmd get_throttled` = `0x50000`. Pi 5V input reads 4.93 V at rest, so it
+  sags under load spikes.
+- **Battery was low**: 10.65 V under load. The two battery topics disagree on
+  percent (`/battery` from the ESP32 firmware says 22%, `/telemetry/battery`
+  says 51.8%) because they use different SoC formulas — trust voltage.
+- **Plan**: one more semantic-node attempt now, then recharge. If dips continue
+  on a full pack, suspect the 5V converter/wiring or power the OAK-D separately.
+  Watch live with `journalctl -kf | grep -i voltage`.
+
+### Launch changes affecting step 1
+
+- `drivers` **no longer starts battery telemetry**; it is now its own `battery`
+  subsystem in `dome2/robot.launch.py`. Yellow Pad joystick is `yellow`.
+- Step 1 is now `bl dome2 robot.launch.py --options "d b"`.
+
+### Run results — 2026-10-22 (low-drain setup)
+
+**Setup used** — chosen to minimize battery drain; no Nav2, no SLAM:
+
+- `bl dome2 robot.launch.py --options "d b"` (drivers + battery)
+- OAK-D via `dome_vision_ros.launch.py --depth true` (task file step 2)
+- **Static identity `map→odom`** instead of SLAM:
+  `ros2 run tf2_ros static_transform_publisher --frame-id map --child-frame-id odom`.
+  Exercises detections→map→tracker→publish; skips re-basing (map never jumps).
+- Semantic node: run from `~/ros2_ws` (from the package dir `ros2 run` said
+  "Package not found"), `-p map_name:=tf33test -p publish_every_n:=5`.
+
+**Findings so far**:
+
+- **Power fine this time**: battery 11.27 V, `get_throttled=0x0`, no
+  undervoltage events.
+- **Load is light**: load avg ~1.05 on 4 cores, 1.2 GiB of 15 GiB RAM,
+  58 °C. `dome_vision` ~9% CPU / 300 MB (inference is on the OAK). OAK 9.9 fps.
+- `map→camera_link` resolves via `tf2_echo` once the static TF is up.
+- **Bug found and fixed**: the node crashed on its first detection with
+  `TypeException: PointStamped is not loaded or supported` — `tf_adapter.py`
+  never imported `tf2_geometry_msgs`; mocked unit tests hid it. Fixed with a
+  real-Buffer regression test (chores.md).
+- **Not yet verified**: node running stable after the fix, confirmed targets
+  on `/semantic/targets` with an object in view, persisted JSON on shutdown.
+  Only empty `/oak/detections_3d` arrays were sampled so far.
+
+### Doc errors to fix (chore, not yet done)
+
+- TF33.0 step 3 says `robot_map.launch.py` is "SLAM only, no Nav2" — wrong,
+  it includes `nav2_bringup navigation_launch.py`. For SLAM without Nav2, run
+  `ros2 launch slam_toolbox online_async_launch.py` with
+  `dome_nav/config/mapper_params_online_async.yaml` directly.
+- TF33.0 step 1 should be `--options "d b"` (only noted here so far).
+
+### Telemetry plotting
+
+- RViz can't plot scalars. PlotJuggler (laptop) only shows `/telemetry/*` if
+  the laptop has `dome_telemetry_msgs` built and sourced; Foxglove WebSocket
+  needs nothing on the laptop. Either is light on the Pi for scalar topics —
+  only image/pointcloud subscriptions load it.
+
 ## Session note
 
-Picking this up on the robot: run TF33.0 before planning any new code — its
-findings determine whether TF33.7/TF33.8 are still the right next tasks or
+Next: rerun the semantic node with an object in view and finish the
+"Not yet verified" items above, then try real SLAM (slam_toolbox without
+Nav2) to exercise re-basing. TF33.0's findings determine whether TF33.7/TF33.8 are still the right next tasks or
 need rethinking.

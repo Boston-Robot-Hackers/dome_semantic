@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-08-03"
+version: "1.1"
+generated: "2026-10-22"
 ---
 
 # `tf_adapter.py` — A Small, Deliberately Boring Wrapper Around TF
@@ -38,6 +38,25 @@ rather than building one itself, so a test can hand it a `MagicMock` and
 control exactly what `.transform()` returns or raises, with no live ROS
 graph involved.
 
+## The import that does nothing visible
+
+```python
+import tf2_geometry_msgs  # noqa: F401  registers PointStamped with tf2
+```
+
+`tf2_ros.Buffer.transform()` is **type-dispatched**: it looks up a
+per-message-type transform function in a registry. Those functions are
+registered as a *side effect of importing* `tf2_geometry_msgs`. Without the
+import, a real buffer raises `TypeException: PointStamped is not loaded or
+supported` on the first detection.
+
+- **Why it hid for so long**: every unit test mocked `.transform()`, so the
+  registry was never consulted. It surfaced only on the first real-robot run
+  (TF33.0).
+- **The guard against regression** is `test_transform_with_real_buffer`,
+  which drives a real `tf2_ros.Buffer` with a static transform instead of a
+  mock.
+
 ## Why `stamp` is a required argument, not "now" or "latest"
 
 This adapter was ported from an earlier version living in `dome_vision_ros`
@@ -73,6 +92,10 @@ instead of being silently swallowed and reported to the caller as "no
 transform," which would make the bug much harder to notice.
 
 ## Observations
+
+- **Mock-only tests can't catch registration bugs.** The real-buffer test
+  above is the pattern to follow whenever a ROS library relies on
+  import-time side effects.
 
 - **Every caller treats `None` the same way: drop this one point, keep
   going.** `SemanticMapNode.on_detections` counts drops and logs a single

@@ -6,7 +6,8 @@
 from unittest.mock import MagicMock
 
 import tf2_ros
-from geometry_msgs.msg import PointStamped
+from builtin_interfaces.msg import Time
+from geometry_msgs.msg import PointStamped, TransformStamped
 
 from dome_semantic.tf_adapter import TFAdapter
 
@@ -76,3 +77,16 @@ def test_custom_frames_respected():
     target = buf.transform.call_args[0][1]
     assert sent_point.header.frame_id == "base_link"
     assert target == "map"
+
+
+def test_transform_with_real_buffer():
+    """A real Buffer needs tf2_geometry_msgs loaded to transform PointStamped."""
+    buf = tf2_ros.Buffer()
+    camera_in_map = TransformStamped()
+    camera_in_map.header.frame_id = "map"
+    camera_in_map.child_frame_id = "camera_link"
+    camera_in_map.transform.translation.x = 1.0
+    camera_in_map.transform.rotation.w = 1.0
+    buf.set_transform_static(camera_in_map, "test")
+    adapter = TFAdapter(buf, "camera_link", "map")
+    assert adapter.transform((0.5, 0.0, 0.2), Time()) == (1.5, 0.0, 0.2)
