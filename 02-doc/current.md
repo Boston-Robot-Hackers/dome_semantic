@@ -44,6 +44,32 @@
   on a full pack, suspect the 5V converter/wiring or power the OAK-D separately.
   Watch live with `journalctl -kf | grep -i voltage`.
 
+### Power: two more brownouts — 2026-10-22 evening
+
+- **Two boots today ended on an `Undervoltage detected!` line** with no
+  shutdown, panic, or OOM: one ~17:20, one at 19:57:26.
+- **19:57 crash sequence**: 7 dips 19:38–19:40 (each recovered in 2–4 s),
+  17 quiet minutes, then at 19:57:25 the OAK-D dropped off USB and
+  re-enumerated as SuperSpeed (USB 3) — then the undervoltage, and the log
+  ends.
+- **Not a manual power-cycle**: the robot rebooted on its own (confirmed).
+  The SSH "lost communication" feel was a separate Wi-Fi issue — power save
+  was on; now off via `/etc/udev/rules.d/70-wifi-powersave.rules`.
+- **Likely trigger**: a pipeline (re)start. The OAK's firmware boot plus the
+  switch to USB 3 is a current spike that pulls the Pi's 5 V below brownout.
+- **Not related**: the kernel `WARNING ... get_throttled_show` at 19:56:36 is
+  `battery_telemetry` reading a deprecated sysfs file — noise, not a fault.
+- **Open question**: low battery (pack drained since the 11.27 V morning run)
+  vs. a 5 V converter/wiring limit. The voltage at crash time isn't in the
+  journal.
+- **Next**:
+  - Check the pack voltage; recharge if it's around 11 V or lower.
+  - If dips continue on a full pack, power the OAK-D separately (powered hub
+    or its own power input), or check the converter's rating — Pi 5 plus the
+    OAK-D at startup needs about 5 A.
+  - Start the OAK-D last while watching `journalctl -kf | grep -i voltage`.
+- **Test procedure**: see `02-doc/power_system_testing.md`.
+
 ### Launch changes affecting step 1
 
 - `drivers` **no longer starts battery telemetry**; it is now its own `battery`
