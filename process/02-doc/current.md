@@ -1,11 +1,15 @@
 # Current status
 
-**2026-10-22** — see `process/02-doc/history.md` for the completed-work log.
+**2026-10-23** — see `process/02-doc/history.md` for the completed-work log.
 
 ## Open
 
-- **Repo state**: everything committed and pushed 2026-10-22, including
-  the TF-wait fix and the power-testing docs; all 130 tests pass.
+- **Repo state**: committed and pushed 2026-10-23 at checkpoint; 135 tests
+  pass, ruff clean. **Pack on the charger** (10.6 V, 181 dips this boot —
+  see 2026-10-23 power notes below); no hardware runs until it's full.
+- **Run the semantic node with** `bl dome_semantic semantic.launch.py
+  --map_name <name> [--static_map_odom true]` (TF33.8 Part A, see
+  `history.md`).
 - **Next actual step: TF33.0, real-hardware verification** (see task file for
   the full bottom-up procedure and per-component launch/diagnostic commands).
   TF33.1-TF33.6 are done (msgs, tracker port, map-frame TF + re-basing, typed
@@ -21,8 +25,11 @@
   Deferred because it's "too much" until TF33.0 shows whether it's actually
   needed — the design lived in a local plan file on the prior VM session and
   was not committed; re-derive or ask if it turns out to be needed after all.
-- **TF33.8–TF33.10** — sub-stack launch integration, Pi CPU measurement,
-  docs: not started. TF33.5 superseded by F35 (consumer is `dome_mission`,
+- **Options while the pack charges**: TF33.7 (fake producer — recommended,
+  bench-tests detections→tracker→publish→persist with Part A's launch and
+  no OAK-D) or wait. Not yet chosen.
+- **TF33.8 Parts B/C, TF33.9–TF33.10** — sub-stack launch integration,
+  ingestion-gating decision, Pi CPU measurement, docs: not started. TF33.5 superseded by F35 (consumer is `dome_mission`,
   not this package).
 
 ## TF33.0 progress — 2026-10-21
@@ -68,6 +75,24 @@
     OAK-D at startup needs about 5 A.
   - Start the OAK-D last while watching `journalctl -kf | grep -i voltage`.
 - **Test procedure**: see `process/02-doc/power_system_testing.md`.
+
+### Power: low pack, rerun postponed — 2026-10-23
+
+- **181 undervoltage events this boot**, the first at 14:10 and a burst of
+  8 between 17:37:09 and 17:38:31. `get_throttled` = `0x50000` (dips earlier
+  in the boot, none at the moment of reading).
+- **The OAK-D kept reconnecting**: it dropped off USB at 17:38:31, the same
+  second as the last dip, and its USB ID appeared 39 times this boot (now
+  device number 35).
+- **Pack low**: 10.54 V on `/battery`, 10.62 V on `/telemetry/battery`
+  (whose 50.8% is wrong for this pack again). It was 11.27 V on the clean
+  10-22 morning run. At idle the 5 V rail reads 5.00 V and the robot draws
+  7.5 W.
+- **Conclusion**: a low pack is the most likely cause. The semantic-node
+  rerun is postponed and the pack is on the charger.
+- **Next**: charge to ~12.6 V, reboot (clears `get_throttled`), rerun with
+  the OAK-D started last. If it still dips on a full pack, suspect the 5 V
+  converter/wiring.
 
 ### Launch changes affecting step 1
 

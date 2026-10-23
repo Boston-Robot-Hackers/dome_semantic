@@ -14,8 +14,8 @@ import rclpy
 import tf2_ros
 from builtin_interfaces.msg import Time as RosTime
 from geometry_msgs.msg import Point, TransformStamped
-from std_msgs.msg import Header
 from rclpy.executors import MultiThreadedExecutor
+from std_msgs.msg import Header
 from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
 from vision_msgs.msg import (
@@ -27,7 +27,6 @@ from vision_msgs.msg import (
 
 from dome_semantic.map_rebasing import PlanarTransform
 from dome_semantic.targets import ConfirmedTarget
-
 
 TEST_DOMAIN_ID = 87  # keeps test traffic off a live robot's graph
 
@@ -370,8 +369,10 @@ def test_detection_waits_for_tf_arriving_after_it():
     spinner.start()
     try:
         assert wait_until(
-            lambda: tf_pub.get_subscription_count() > 0
-            and det_pub.get_subscription_count() > 0,
+            lambda: (
+                tf_pub.get_subscription_count() > 0
+                and det_pub.get_subscription_count() > 0
+            ),
             5.0,
         )
         det_pub.publish(make_detections([(0.0, 0.0, 1.0, "cup", None)], sec=100))

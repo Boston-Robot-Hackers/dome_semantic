@@ -79,10 +79,9 @@ no-SLAM check, a static identity `map`→`odom` works:
 Check: `ros2 run tf2_ros tf2_echo map camera_link` — not in `ros2diag`'s
 `r2tfcheck` predefined pairs, so this one is manual.
 
-**4. dome_semantic node** — no launch file exists yet (TF33.8), `ros2 run`
-only, from `~/ros2_ws` (from the package dir it reports "Package not found"):
-`ros2 run dome_semantic semantic_map_node --ros-args -p map_name:=<name> -p
-publish_every_n:=5`
+**4. dome_semantic node** (TF33.8 Part A launch; `--static_map_odom true`
+replaces step 3's static TF when skipping SLAM):
+`bl dome_semantic semantic.launch.py --map_name <name> --publish_every_n 5`
 Check: `ros2 topic hz /semantic/targets`, `/targets/markers`; `ros2 topic
 echo /semantic/targets` for content; `/targets/assoc_diag` if
 `use_class_profiles` is on.
@@ -313,32 +312,46 @@ test.
 **Test**: smoke test — node under test confirms a scripted object end-to-end
 in sim time.
 
-## TF33.8 — Perception+SLAM+explore+semantic sub-stack
+## TF33.8 — Semantic node launch, then the semantic sub-stack
 
-**Status**: not done
+**Status**: Part A done (2026-10-23); Parts B and C not started
 
-**Launch ownership is already settled** (F33 G9 / TF35 T07): the top-level
-launch is `dome_mission`'s `mission_explore.launch.py`. *This task owns only
-the sub-stack composed into that launch* — not a second top-level launch.
+**Three parts, in order.** A and B are launch files; C is a design decision.
+Part A is small and unblocks TF33.0 reruns now; B and C wait on TF33.0's
+findings.
 
-Delivers the OAK-D + `slam_toolbox` + Nav2 + `explorer_manager_node` +
-`dome_semantic` group (in `robot_explore_semantic.launch.py` or a dedicated
-include), with documented ordering — TF chain before detections flow, reusing
-`sim_nav_full`'s proven `map→odom` wait pattern.
+### Part A — launch file: `semantic.launch.py` (this package)
 
-No direct `/intent` wiring into the explorer here — that's `dome_mission`'s
-(done, TF35 T04). `mission_explore.launch.py` currently `bl.include`s this
-sub-stack's *absence* with a "TF33 uncoded" note; landing this task means
-updating that include, not writing a fresh launch file.
+- Launches `semantic_map_node` with `map_name` and `publish_every_n` as
+  launch args — replaces the bare `ros2 run` in TF33.0 step 4.
+- Optional arg to also start the static identity `map→odom` (TF33.0's
+  no-SLAM setup); off by default.
+- Node only — no OAK-D, SLAM, or Nav2. Part B includes this file.
 
-**Also includes** the Phase A ingestion-gating decision (F33 constraints):
-gate semantic ingestion on robot motion, or accept degraded association while
-driving — *measure and pick one, record why*. Sim variant uses the TF33.7
-fake producer.
+### Part B — launch file: perception+SLAM+explore+semantic sub-stack
 
-**Test**: sim integration test (marked ROS2-runtime per style guide) — explore
-with fake detections → semantic map contains the scripted objects in `map`
-frame within tolerance. Manual: real-robot run recorded in notes.
+- An includable launch file composing OAK-D + `slam_toolbox` + Nav2 +
+  `explorer_manager_node` + Part A, with documented ordering: TF chain
+  before detections flow, reusing `sim_nav_full`'s `map→odom` wait pattern.
+- **Not a top-level launch** (F33 G9 / TF35 T07): `dome_mission`'s
+  `mission_explore.launch.py` stays top-level and includes this, replacing
+  its current "TF33 uncoded" note. No `/intent` wiring here (TF35 T04).
+
+### Part C — decision: ingestion while driving
+
+- F33 constraint: gate semantic ingestion on robot motion, or accept
+  degraded association while driving — *measure and pick one, record why*.
+
+**Tests**:
+
+- **A** (done): `test/test_semantic_launch.py` runs the launch function
+  against a fake BetterLaunch (no ROS runtime) — params, required
+  `map_name`, static TF on/off. Live run on the robot 2026-10-23: node up
+  with the passed params, `map→odom` identity published, clean shutdown.
+- **B**: sim integration test (ROS2-runtime) with TF33.7's fake producer —
+  explore → semantic map holds the scripted objects in `map` frame within
+  tolerance; plus a manual real-robot run recorded in notes.
+- **C**: the measurement itself, recorded in notes.
 
 ## TF33.9 — Pi CPU headroom measurement
 

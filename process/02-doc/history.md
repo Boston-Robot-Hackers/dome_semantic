@@ -97,3 +97,21 @@ Append new entries here when marking work done in `current.md`.
   tests still pass unchanged. Also fixed a real (if minor) finding in this
   session's own code: `seconds_to_ros_time`'s redundant `int(round(...))` —
   `round()` on a float with no `ndigits` already returns `int`.
+- **TF33.8 reworded** (2026-10-23) — split into Part A (node-only launch
+  file), Part B (includable perception+SLAM+explore+semantic sub-stack
+  launch file) and Part C (ingestion-while-driving decision), each with its
+  own test line.
+- **TF33.8 Part A** (2026-10-23) — `launch/semantic.launch.py`
+  (better_launch): `semantic_map_node` with required `map_name` (refuses to
+  start without it, since the node's `"unknown"` default would share one
+  persistence file across maps) and `publish_every_n`; optional
+  `--static_map_odom true` adds the identity `map→odom` for no-SLAM bench
+  runs. `setup.py` installs `launch/`; `package.xml` gains
+  `exec_depend better_launch`. `test/test_semantic_launch.py` (5 tests,
+  fake BetterLaunch, no ROS runtime). Live on the robot: params set,
+  `map→odom` published, clean shutdown with map saved. New literate chapter
+  `14-semantic_launch.md`.
+- **Checkpoint** (2026-10-23) — ruff (via `dome_vision/.ruff-venv`, not
+  installed system-wide on the robot) fixed one import-order finding and
+  reformatted two test files left over from the 10-22 TF fixes. 135 tests
+  pass.

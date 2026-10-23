@@ -160,9 +160,10 @@ The chapters build bottom-up — each one only depends on chapters before it:
 | 11 | [`tracker_params.py`](11-tracker_params.md) | config → ROS parameters |
 | 12 | [`semantic_persistence.py`](12-semantic_persistence.md) | save/restore keyed to SLAM map identity |
 | 13 | [`semantic_map_node.py`](13-semantic_map_node.md) | the ROS node that wires it all together |
+| 14 | [`semantic.launch.py`](14-semantic_launch.md) | launching the node (optional no-SLAM `map→odom`) |
 
 Reading 05 → 06 → 07 → 10 in sequence covers the tracking algorithm itself
-end to end; 08, 09, 11, 12, 13 cover how that algorithm gets fed from, and
+end to end; 08, 09, 11, 12, 13, 14 cover how that algorithm gets fed from, and
 exposed back to, a live ROS system.
 
 ## What's deliberately not in this package yet
