@@ -4,9 +4,10 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 Read and follow all rules in the `.claude/` folder:
 - `.claude/process.md` — development workflow and feature/task tracking rules
-- `02-doc/current.md` — session handoff; only the `## Open` section matters for
-  new work, see `02-doc/history.md` for the completed-work log
-- `02-doc/notes.md` — semi-permanent project notes
+- `process/02-doc/current.md` — session handoff; only the `## Open` section
+  matters for new work, see `process/02-doc/history.md` for the completed-work
+  log
+- `process/02-doc/notes.md` — semi-permanent project notes
 
 Before writing or reviewing code, read and follow `.claude/style_guide.md`
 (coding standards, style rules, and review checklist) — apply it yourself
@@ -19,9 +20,10 @@ association, lost/removed timeouts) in the SLAM `map` frame and publishes
 behavior to consume. Neutral package: depends only on `dome_semantic_msgs`
 and TF — `dome_nav` never depends on it and vice versa.
 
-Literate docs are in `01-literate/`, project docs are in `02-doc/`, features are
-in `03-features/`, tasks are in `04-tasks/`, issues are in `05-issues/`, and the
-spec is in `02-doc/spec.md`.
+All process files live under `process/`: literate docs in
+`process/01-literate/`, project docs in `process/02-doc/`, features in
+`process/03-features/`, tasks in `process/04-tasks/`, issues in
+`process/05-issues/`, and the spec at `process/02-doc/spec.md`.
 
 ## Agent model selection
 

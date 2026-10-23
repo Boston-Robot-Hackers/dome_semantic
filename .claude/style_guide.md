@@ -10,10 +10,10 @@ human review on the judgment items below.
 ## Process
 - No code without a matching feature + task file; no task file without a feature.
 - Update feature/task status when work completes or defers.
-- Resolve or document mismatches between `02-doc/current.md` and the
+- Resolve or document mismatches between `process/02-doc/current.md` and the
   feature/task/issue files before relying on either.
 - Run relevant tests; commit only when requested.
-- Before a PR: regenerate `01-literate/<module>.md` for each changed source file.
+- Before a PR: regenerate `process/01-literate/<module>.md` for each changed source file.
 
 ## Errors — report, don't guess and "fix"
 On something wrong or unexpected, raise or warn — never infer intent and
@@ -115,7 +115,7 @@ Applies to any project with a UI layer (Streamlit, Flask, Dash, etc.).
   in the docstring. That is the one place for a fuller explanation; it does not
   license narrative comment blocks in the body.
 - No multi-line narrative comment blocks in code. A comment is a short "why",
-  not prose; long rationale goes to the docstring or `01-literate/`.
+  not prose; long rationale goes to the docstring or `process/01-literate/`.
 
 **SHOULD**
 - A module-level docstring below the file header states the file's purpose and

@@ -39,7 +39,7 @@ dome_nav** — dome_nav must never gain a `dome_semantic_msgs` dependency.
 
 ## TF33.0 — Real-hardware verification: test the stack bottom-up
 
-**Status**: in progress — run notes in `02-doc/current.md`
+**Status**: in progress — run notes in `process/02-doc/current.md`
 
 TF33.1–TF33.6 are done but only unit-tested — never run against real OAK-D
 hardware. No combined launch exists yet (that's TF33.8), so verification is
@@ -90,7 +90,7 @@ echo /semantic/targets` for content; `/targets/assoc_diag` if
 **On shutdown**: check the persisted file matches what was seen live —
 `~/.dome/semantic_maps/<map_name>.json`.
 
-**Test**: manual — real-robot run, findings recorded in `02-doc/current.md`.
+**Test**: manual — real-robot run, findings recorded in `process/02-doc/current.md`.
 
 ## TF33.1 — `dome_semantic_msgs` package
 
@@ -117,7 +117,7 @@ this still holds*, but no further authoring work is needed here.
 **Status**: done (2026-08-02)
 
 New sibling repo `~/ros2_ws/src/dome_semantic` (bootstrapped from `~/j3`:
-`.claude/`, `02-doc/`, `03-features/`, `04-tasks/`, `05-issues/`). F33/TF33
+`.claude/`, `process/02-doc/`, `process/03-features/`, `process/04-tasks/`, `process/05-issues/`). F33/TF33
 records stayed in `dome_nav` at first, per F35's relocate-with-the-code
 pattern. **Update (2026-08-03)**: relocated here — now that TF33.1–TF33.4/
 TF33.6 are done, this is the file's permanent home.
@@ -240,7 +240,7 @@ targets). 119 total tests pass; `colcon build --packages-select
 dome_semantic_msgs dome_semantic` clean (after clearing a stale, unrelated
 `build/dome_semantic_msgs` CMake cache).
 
-**Literate**: full 01-literate/ set generated for dome_semantic
+**Literate**: full process/01-literate/ set generated for dome_semantic
 (00-overview.md theory-of-operation plus one chapter per module) — the
 package had none before this task. Extended under TF33.6 to cover
 persistence.
@@ -349,13 +349,13 @@ rate (baseline 8.6 Hz vs 20 desired), TF queue drops, load average. Image pubs
 off, on-device NN only. Decides whether Phase A ships on-Pi or needs rate
 caps/offboard (G7).
 
-**Test**: manual — numbers recorded in `02-doc/notes.md`.
+**Test**: manual — numbers recorded in `process/02-doc/notes.md`.
 
 ## TF33.10 — Docs, literate, current.md
 
 **Status**: not done
 
-Update `02-doc/current.md` (F33 underway, Phase A status), regenerate literate
+Update `process/02-doc/current.md` (F33 underway, Phase A status), regenerate literate
 for every changed dome_nav Python module, note the new packages in
 README/CLAUDE.md if layout docs reference package lists.
 

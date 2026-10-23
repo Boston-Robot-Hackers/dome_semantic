@@ -82,11 +82,11 @@ Append new entries here when marking work done in `current.md`.
   case that can't occur. Node gained a `map_name` param (default
   `"unknown"`) and a `save()` called from `main()`'s `finally`. 127 tests
   pass; `colcon build` clean.
-- **Full `01-literate/` set** (2026-08-03) — `00-overview.md`
+- **Full `process/01-literate/` set** (2026-08-03) — `00-overview.md`
   theory-of-operation plus one dependency-ordered chapter per module (14
   files total: 00 + 13). Package had none before this session.
 - **Checkpoint** (2026-08-03) — `ruff check`/`ruff format` clean across the
-  repo, including fenced Python blocks inside `01-literate/*.md` (a newer
+  repo, including fenced Python blocks inside `process/01-literate/*.md` (a newer
   ruff feature reformats those too). One substantive fix, this time
   **reversing** the 2026-08-02 checkpoint's deliberate call: that session
   left two `SIM102` (nested-if) findings in `association.py` unfixed,

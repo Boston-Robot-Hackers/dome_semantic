@@ -11,7 +11,7 @@ object is placed on a **semantic map** in SLAM-map coordinates. End result of a
 run: a metric map (slam_toolbox, as today) plus a semantic map of object
 locations aligned with it, reusable later by Mode B go-to-label navigation.
 
-Motivation and full gap analysis: `02-doc/analysis.md` (2026-07-29). This
+Motivation and full gap analysis: `process/02-doc/analysis.md` (2026-07-29). This
 feature implements the integration it describes.
 
 ## Settled decisions (2026-07-30, author)

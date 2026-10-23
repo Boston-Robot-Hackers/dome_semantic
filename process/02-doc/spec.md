@@ -33,6 +33,6 @@ split out of `dome_vision`'s `embedding.py` into a small local
 which stays in `dome_vision` — the tracker only ever compares
 already-extracted embedding vectors, never runs extraction itself).
 
-See `03-features/notdone/F33-semantic-exploration.md` and
-`04-tasks/notdone/TF33-semantic-exploration.md` for the full feature/task
+See `process/03-features/notdone/F33-semantic-exploration.md` and
+`process/04-tasks/notdone/TF33-semantic-exploration.md` for the full feature/task
 record.

@@ -1,12 +1,11 @@
 # Current status
 
-**2026-10-22** — see `02-doc/history.md` for the completed-work log.
+**2026-10-22** — see `process/02-doc/history.md` for the completed-work log.
 
 ## Open
 
-- **Repo state**: `tf2_geometry_msgs` fix committed and pushed 2026-10-22.
-  The TF-wait fix (below) and TF33.0 doc fixes are committed, not pushed;
-  all 130 tests pass.
+- **Repo state**: everything committed and pushed 2026-10-22, including
+  the TF-wait fix and the power-testing docs; all 130 tests pass.
 - **Next actual step: TF33.0, real-hardware verification** (see task file for
   the full bottom-up procedure and per-component launch/diagnostic commands).
   TF33.1-TF33.6 are done (msgs, tracker port, map-frame TF + re-basing, typed
@@ -68,7 +67,7 @@
     or its own power input), or check the converter's rating — Pi 5 plus the
     OAK-D at startup needs about 5 A.
   - Start the OAK-D last while watching `journalctl -kf | grep -i voltage`.
-- **Test procedure**: see `02-doc/power_system_testing.md`.
+- **Test procedure**: see `process/02-doc/power_system_testing.md`.
 
 ### Launch changes affecting step 1
 

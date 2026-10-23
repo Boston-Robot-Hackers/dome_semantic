@@ -7,26 +7,26 @@
 * Switching between task/feature/chore: stop and ask permission first.
 
 # chores
-* One running file, `04-tasks/chores.md`: `- [ ] <what and why>` → `- [x]` when applied.
+* One running file, `process/04-tasks/chores.md`: `- [ ] <what and why>` → `- [x]` when applied.
 
 # features
-* `FNN-<slug>.md` in `03-features/{notdone,done,deferred}/`; a mini-spec — scope/intent, not task detail.
-* `Tasks File Created: yes` only once a matching `04-tasks/TFNN-*.md` exists. `template.md` shows the format.
+* `FNN-<slug>.md` in `process/03-features/{notdone,done,deferred}/`; a mini-spec — scope/intent, not task detail.
+* `Tasks File Created: yes` only once a matching `process/04-tasks/TFNN-*.md` exists. `template.md` shows the format.
 
 # tasks
-* Full task list before any design/code. `TFNN-<slug>.md` (`NN` matches the feature) in `04-tasks/{notdone,done,deferred}/`; `template.md` shows the format.
+* Full task list before any design/code. `TFNN-<slug>.md` (`NN` matches the feature) in `process/04-tasks/{notdone,done,deferred}/`; `template.md` shows the format.
 * Each step is numbered `TFNN.N`, matching the file's own `TFNN` (e.g. `TF03.0`, `TF03.1`, ...), starting at `.0` — not a bare `T0N`.
-* Soft caps: a step's body <= 30 lines, a TF file <= 150 lines. Beyond that, split the step into two, move procedural detail (commands, diagnostics) to `02-doc/current.md`/`notes.md` with the step pointing at it, or split remaining scope into a new phase/task file.
+* Soft caps: a step's body <= 30 lines, a TF file <= 150 lines. Beyond that, split the step into two, move procedural detail (commands, diagnostics) to `process/02-doc/current.md`/`notes.md` with the step pointing at it, or split remaining scope into a new phase/task file.
 * Every step gets a test where feasible (else record why); every feature gets a dedicated test-writing task.
 * Task lists must never include a "regenerate literate docs" task — literate docs are refreshed later, at checkpoint, not as part of a feature's task list.
 * Last task done → move the task file to `done/`, set the feature's Done/Tests Written/Test Passing to yes, move the feature file to `done/`.
 
 # issues
-* `05-issues/{open,closed,deferred}/`, numbered, follow the template.
+* `process/05-issues/{open,closed,deferred}/`, numbered, follow the template.
 * New → `open/`; resolved or absorbed into a feature/task → `closed/`; explicitly deferred → `deferred/`.
 
 # writing .md files
-* Applies to `03-features/`, `04-tasks/`, `05-issues/`, and any hand-written doc — not `01-literate/` (own prompt in `literate.md`).
+* Applies to `process/03-features/`, `process/04-tasks/`, `process/05-issues/`, and any hand-written doc — not `process/01-literate/` (own prompt in `literate.md`).
 * Blank line between paragraphs, always. Short paragraphs; bullets for anything enumerable; **bold** for key decisions; *italics* for emphasis or naming a pattern. Several short, headed subsections beat one block.
 * Applies every time a file is rewritten, not just on first authoring.
 
@@ -40,6 +40,6 @@
 * `.claude/bootstrap.md` is the scaffold spec. Run `/bootstrap` to bootstrap a new project — don't follow it ad hoc from a mention in conversation.
 
 # github
-* Literate docs: apply `.claude/literate.md`'s prompt to each changed Python module, save as `01-literate/<module>.md`.
+* Literate docs: apply `.claude/literate.md`'s prompt to each changed Python module, save as `process/01-literate/<module>.md`.
 * Run tests and regenerate literate docs before committing/pushing.
 * Commit or push only when asked, with a good message.
