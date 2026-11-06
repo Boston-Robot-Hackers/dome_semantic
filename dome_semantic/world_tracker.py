@@ -45,6 +45,11 @@ class WorldTracker:
             self.profiles = parse_class_profiles(self.config.class_profiles_inline)
         elif self.config.class_profile_path:
             self.profiles = load_class_profiles(self.config.class_profile_path)
+        if not self.profiles:
+            raise ValueError(
+                "use_class_profiles is true but no class profiles loaded: set "
+                "class_profiles_inline or class_profile_path to a non-empty list"
+            )
         self.label_map = build_label_map(self.profiles)
 
     def update(self, observations: list, timestamp_s: float) -> list[ConfirmedTarget]:

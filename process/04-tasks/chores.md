@@ -10,3 +10,7 @@ Simple bug fixes and refactors (no spec/behavior change). One line each:
   behind detection stamps, so the zero-wait lookup always extrapolated and
   every detection was dropped (found in TF33.0 on the robot). Added a
   late-arriving-TF regression test.
+- [x] Add `process/02-doc/power_load_test.md`, a runbook for the staged OAK
+  power load test, linked from `power_system_testing.md` step 2, so the
+  procedure and the 2026-11-05 lessons (USB 2 fallback, USB 3 Wi-Fi
+  interference) aren't lost in `current.md`.

@@ -18,6 +18,14 @@ import pytest
 from better_launch.utils.click import DeclaredArg, get_click_options
 
 LAUNCH_FILE = pathlib.Path(__file__).parent.parent / "launch" / "semantic.launch.py"
+CONFIG_DIR = pathlib.Path(__file__).parent.parent / "config"
+
+
+def find_in_source_config(package: str, filename: str) -> str:
+    """Stand-in for bl.find: resolve against the source tree's config/, which
+    is what colcon installs to share/dome_semantic/config."""
+    assert package == "dome_semantic"
+    return str(CONFIG_DIR / filename)
 
 
 def load_launch_function(fake_bl: MagicMock | None = None):
@@ -34,6 +42,7 @@ def load_launch_function(fake_bl: MagicMock | None = None):
 def launched_nodes(**launch_args) -> dict[str, dict]:
     """Return {node name: bl.node kwargs} for one run of the launch function."""
     fake_bl = MagicMock()
+    fake_bl.return_value.find.side_effect = find_in_source_config
     load_launch_function(fake_bl)(**launch_args)
     node_calls = fake_bl.return_value.node.call_args_list
     return {call.kwargs["name"]: call.kwargs for call in node_calls}
@@ -55,8 +64,20 @@ def test_map_name_is_required():
 
 def test_node_gets_passed_params():
     nodes = launched_nodes(map_name="kitchen", publish_every_n=3)
-    expected = {"map_name": "kitchen", "publish_every_n": 3}
+    expected = {
+        "map_name": "kitchen",
+        "publish_every_n": 3,
+        "class_profile_path": str(CONFIG_DIR / "class_profiles.yaml"),
+    }
     assert nodes["semantic_map"]["params"] == expected
+
+
+# Without these two files the node falls back to defaults and PASA is off.
+def test_node_always_gets_tracker_config_files():
+    node = launched_nodes(map_name="kitchen")["semantic_map"]
+    assert node["param_files"] == str(CONFIG_DIR / "semantic_map.yaml")
+    assert pathlib.Path(node["param_files"]).is_file()
+    assert pathlib.Path(node["params"]["class_profile_path"]).is_file()
 
 
 def test_static_map_odom_off_by_default():

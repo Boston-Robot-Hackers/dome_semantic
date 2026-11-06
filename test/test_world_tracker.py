@@ -394,6 +394,18 @@ def test_normalize_label_disabled():
     assert tracker.label_map.get("cup", "cup") == "cup"
 
 
+# PASA on with no profiles must raise, not silently run label+distance only.
+@pytest.mark.parametrize(
+    "profile_source",
+    [{}, {"class_profiles_inline": []}],
+    ids=["no-source", "empty-inline"],
+)
+def test_pasa_without_profiles_raises(profile_source):
+    config = WorldTrackerConfig(use_class_profiles=True, **profile_source)
+    with pytest.raises(ValueError, match="no class profiles loaded"):
+        WorldTracker(config)
+
+
 # Two observations of "cup" near the same position must merge into one target.
 def test_coarse_labels_associate_to_same_target():
     tracker = WorldTracker(

@@ -1,0 +1,17 @@
+# ROS params for semantic_map_node's WorldTracker, as the robot runs it.
+# Values match dome_vision's roboflow_oak.yaml world_tracker section; unset fields keep
+# their WorldTrackerConfig defaults. class_profile_path is set by semantic.launch.py to
+# the installed config/class_profiles.yaml.
+# Doubles must be written with a decimal point: ROS rejects an int for a double param.
+
+/**:
+  ros__parameters:
+    use_class_profiles: true            # enable PASA: per-class size priors and label normalisation
+    assoc_cost_distance_weight: 1.0
+    assoc_cost_size_weight: 0.0         # 0 = disabled until depth quality is verified
+    assoc_cost_stationary_weight: 0.0   # 0 = disabled
+    assoc_cost_track_hint_weight: 0.3   # small bias toward the same SORT track
+    stationary_window_s: 2.0
+    size_confidence_floor: 0.5
+    enable_false_split_recovery: false  # experimental
+    false_split_lookback_s: 5.0

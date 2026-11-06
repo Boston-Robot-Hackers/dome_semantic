@@ -12,6 +12,10 @@ node's own "unknown" default would silently share one file across maps.
 `static_map_odom` also starts an identity `map→odom` static transform, the
 no-SLAM setup for bench checks. Never combine it with SLAM: both would
 publish `map→odom`.
+
+The node always gets the installed `config/semantic_map.yaml` and
+`config/class_profiles.yaml` (F34). Without them every tracker param keeps its
+dataclass default, which leaves PASA off.
 """
 
 from better_launch import BetterLaunch, launch_this
@@ -43,6 +47,11 @@ def semantic_launch(
         "dome_semantic",
         "semantic_map_node",
         name="semantic_map",
-        params={"map_name": map_name, "publish_every_n": publish_every_n},
+        params={
+            "map_name": map_name,
+            "publish_every_n": publish_every_n,
+            "class_profile_path": bl.find("dome_semantic", "class_profiles.yaml"),
+        },
+        param_files=bl.find("dome_semantic", "semantic_map.yaml"),
         ros_waittime=30.0,
     )

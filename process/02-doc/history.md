@@ -115,3 +115,26 @@ Append new entries here when marking work done in `current.md`.
   installed system-wide on the robot) fixed one import-order finding and
   reformatted two test files left over from the 10-22 TF fixes. 135 tests
   pass.
+- **TF33.0 hardware runs** (2026-10-21 to 10-23) — first runs on the robot,
+  with a static identity `map→odom` instead of SLAM. **Detections → tracker
+  → `/semantic/targets` → persisted JSON → restored on relaunch, all
+  verified** (two `can` targets at ~(1.32, ∓0.3) in `map`, ~2 Hz with
+  `publish_every_n 5`). Two bugs found and fixed, each with a regression
+  test (see `chores.md`): `tf_adapter.py` never imported
+  `tf2_geometry_msgs`, and the zero-wait TF lookup dropped every detection
+  (odometry TF lags 10–150 ms; now waits up to 0.2 s under a
+  `MultiThreadedExecutor`). Load was light: load avg ~1.05, 1.2 GiB RAM,
+  `dome_vision` ~9% CPU. **Power was the blocker**: repeated undervoltage
+  and two brownout crashes on 10-22; details in `power_testing.md`'s results
+  log. Only the SLAM re-basing run remains.
+- **F34 code** (2026-10-24) — ships `config/semantic_map.yaml` and
+  `config/class_profiles.yaml`; the launch always passes them, so PASA runs
+  on; `WorldTracker` raises when PASA is on with no profiles. TF34.0–TF34.4
+  done; the TF34.5 hardware check is still open.
+- **F35 power load test** (2026-11-05, closed) — `tools/power_load_test.sh`
+  plus `tools/power_summary.awk` and `power_testing.md` replace
+  `power_load_test.md`, `power_system_testing.md` and `dome_vision`'s
+  `examples/power_stress_test.py`, which logged the SoC core voltage
+  instead of the 5 V input (removed in `dome_vision` c21ad8d). First run:
+  all seven stages clean, worst 5.01 V, but with the OAK-D at USB 2. 7 new
+  tests; 153 pass.

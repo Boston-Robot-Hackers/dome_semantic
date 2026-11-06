@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-10-23"
+version: "1.1"
+generated: "2026-11-05"
 ---
 
 # `semantic.launch.py` — One Command for the Semantic Node
@@ -100,7 +100,12 @@ bl.node(
     "dome_semantic",
     "semantic_map_node",
     name="semantic_map",
-    params={"map_name": map_name, "publish_every_n": publish_every_n},
+    params={
+        "map_name": map_name,
+        "publish_every_n": publish_every_n,
+        "class_profile_path": bl.find("dome_semantic", "class_profiles.yaml"),
+    },
+    param_files=bl.find("dome_semantic", "semantic_map.yaml"),
     ros_waittime=30.0,
 )
 ```
@@ -110,9 +115,27 @@ bl.node(
 - **`ros_waittime=30.0`** is how long better_launch waits for the node to
   appear on the graph. Python node startup on the Pi is slow enough that
   the 3 s default is tight; the sibling launch files use 30 s too.
-- Only two parameters are exposed. The ~20 tracker tuning parameters
-  (chapter 11) keep their `WorldTrackerConfig` defaults; exposing them here
-  would be speculative until a run shows one needs tuning.
+- **The tracker config always comes from installed files** (F34). The
+  ~20 tracker parameters (chapter 11) come from `config/semantic_map.yaml`,
+  and `class_profile_path` points at `config/class_profiles.yaml`. Both are
+  found through `bl.find`, which looks under the package's installed `share/`
+  directory.
+
+### Why the files are not optional
+
+Before F34 nothing set the tracker parameters, so the node ran at
+`WorldTrackerConfig` defaults: **PASA off** and a flat 0.6 m confirmed
+radius. Two cans 0.5 m apart merged into one target. `dome_vision` had the
+same bug (its I03).
+
+Passing the files unconditionally means there is no launch path that starts
+the node on bare defaults. The values are copied from `dome_vision`'s
+`roboflow_oak.yaml`, not read from it, so this package keeps no dependency
+on the repo it was split out of.
+
+Only `map_name`, `publish_every_n` and `static_map_odom` remain launch
+arguments. Retuning means editing the YAML, not adding an argument per
+field.
 
 ## Testing
 
@@ -124,6 +147,8 @@ records `bl.node(...)` calls instead of starting processes. The tests check:
 - the click options build from the annotations;
 - a missing `map_name` raises;
 - the node receives the passed parameters;
+- the node always gets the params file and a `class_profile_path`, and both
+  exist (the fake `bl.find` resolves against the source tree's `config/`);
 - the static transform is absent by default and correct when enabled.
 
 These need no ROS runtime, so they run in the plain test suite. A live run
@@ -136,9 +161,9 @@ shutdown with the map saved.
 1. **The decorator-stripping loader is duplicated** from `dome_vision_ros`'s
    `test_launch_args.py`. Fine for two packages; if a third needs it, it
    belongs in a shared test helper.
-2. **No tracker tuning is exposed.** When a hardware run shows a threshold
-   needs changing, add a `param_files` YAML argument rather than one launch
-   argument per field.
+2. **The config path is fixed.** A `--config` override would allow an
+   experimental YAML without editing the installed one. Worth adding only
+   once someone actually needs an A/B run.
 3. **The string-matching strip** (`"@launch_this(ui=True)"`) breaks silently
    if the decorator's arguments change — the test would then *launch* the
    node. Matching the decorator by regex, or asserting it was removed, would

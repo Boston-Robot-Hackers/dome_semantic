@@ -1,0 +1,32 @@
+# Class profiles for PASA association on the robot.
+# Values copied unchanged from dome_vision's roboflow_oak.yaml (world_tracker.class_profiles_inline).
+# canonical_class is the label published on /semantic/targets, and dome_mission matches it
+# exactly ("nav go can"), so keep it short.
+# examples/configs/class_profiles.yaml is a separate test fixture; do not point the robot at it.
+
+class_profiles:
+  - canonical_class: can
+    display_name: "soda can"            # human-readable name used in speech output
+    abbrev: CN                          # overlay prefix for confirmed targets, e.g. CN3
+    detector_labels: ["can"]
+    height_range_m: [0.115, 0.130]
+    diameter_range_m: [0.060, 0.068]
+    aspect_ratio_range: [1.7, 2.1]      # height/width bounding-box ratio
+    max_stationary_speed_mps: 0.02
+    size_confidence_floor: 0.5
+    depth_noise_scale: 1.0
+    merge_radius_m: 0.10                # max distance between two confirmed targets to consider merging
+    drift_tolerance_m: 0.15             # re-observation radius for a confirmed target (sensor noise, not drift)
+
+  - canonical_class: cup
+    display_name: "coffee cup"
+    abbrev: CP
+    detector_labels: ["cup"]
+    height_range_m: [0.085, 0.120]
+    diameter_range_m: [0.075, 0.095]
+    aspect_ratio_range: [0.9, 1.5]
+    max_stationary_speed_mps: 0.02
+    size_confidence_floor: 0.5
+    depth_noise_scale: 1.2              # curved/shiny surfaces add depth noise
+    merge_radius_m: 0.12
+    drift_tolerance_m: 0.20             # wider than can because of the higher depth noise

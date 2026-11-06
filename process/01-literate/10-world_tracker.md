@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-08-03"
+version: "1.1"
+generated: "2026-11-05"
 ---
 
 # `world_tracker.py` — The State Machine That Turns Noisy Sightings Into Facts
@@ -186,6 +186,27 @@ folds the new observation into its existing running statistics) rather than
 letting a duplicate spawn. `enable_false_split_recovery` gates this whole
 step — off by default, matching the general pattern in this codebase of new
 behavior being opt-in until proven.
+
+## Class profiles: fail loudly when PASA has nothing to work with
+
+```python
+def load_profiles(self) -> None:
+    if not self.config.use_class_profiles:
+        return
+    ...  # class_profiles_inline wins, else class_profile_path
+    if not self.profiles:
+        raise ValueError("use_class_profiles is true but no class profiles loaded: ...")
+```
+
+**PASA** (per-class size priors and label normalisation) needs at least one
+class profile. Without the guard, `use_class_profiles: true` with no profile
+source quietly degrades to label-plus-distance association. That looks like
+PASA is running, but it isn't.
+
+That *silent degradation* is exactly how the I03 bug hid in `dome_vision`:
+the config said PASA was on, and nothing complained. Raising at construction
+turns a misconfiguration into a startup error that names the fix. The check
+covers both missing sources and an empty inline list.
 
 ## Persistence: enough to re-associate, not everything
 

@@ -21,6 +21,13 @@ depending on the object-detection stack directly.
 - **Publish** (later task): `SemanticTargetArray` on `/semantic/targets`, the
   contract `dome_mission` already consumes.
 
+## Support tooling
+
+Hardware checks needed to verify F33 on the robot live here too, even when
+they span other packages. The first is the **power load test**: the robot's
+5 V supply browns out under OAK-D load, which blocks the TF33.0 hardware
+runs.
+
 ## Origin
 
 `world_tracker.py` and its pure dependency closure (`association.py`,
