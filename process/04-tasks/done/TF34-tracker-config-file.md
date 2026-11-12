@@ -69,7 +69,7 @@ order matters and the test encodes it.
 
 ## TF34.5 — Hardware check on the robot
 
-**Status**: not done
+**Status**: done (2026-11-10). Results are in `process/02-doc/current.md`.
 
 **Description**: Run F34's demo on external power. Record in
 `process/02-doc/current.md` whether `use_class_profiles` reads true, the target

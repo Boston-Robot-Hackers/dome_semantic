@@ -148,26 +148,30 @@ yaw as the heading the *robot* should arrive facing, not a claim about the
 object — so identity is the honest value until a real orientation source
 exists.
 
-### Markers: three primitives per confirmed target
+### Markers: a sphere and a label per confirmed target
 
 ```python
-sphere = make_marker(stamp, MAP_FRAME, "semantic_map", base_id, Marker.SPHERE)
+sphere = make_marker(stamp, MAP_FRAME, "semantic_map", t.target_id * 2, Marker.SPHERE)
 ...
-text = make_marker(
-    stamp, MAP_FRAME, "semantic_map", base_id + 1, Marker.TEXT_VIEW_FACING
-)
-...
-line = make_marker(stamp, MAP_FRAME, "semantic_map", base_id + 2, Marker.LINE_STRIP)
+text.text = short_label(t.canonical_class, t.target_id, self.tracker.profiles)
 ```
 
-Three markers share one `target_id * 3` numbering scheme (`base_id`,
-`base_id + 1`, `base_id + 2`) so each target's sphere/label/leader-line
-triplet gets stable, non-colliding RViz marker IDs across publish cycles —
-RViz treats a marker ID as identity, so reusing a target's IDs on the next
-publish updates the existing markers in place instead of accumulating
-duplicates. Faint, unlabeled dots mark `potential_targets` (not yet
-confirmed) in a separate namespace, so a viewer can watch an object
-accumulate evidence before it "becomes real."
+**The label matches the annotated image.** `short_label` gives `CN4` for
+can target 4: the class profile's `abbrev` plus the target ID. A class with
+no abbrev falls back to its first two letters, upper-cased. That's the same
+rule `dome_vision`'s `draw_detections` uses for its image label
+(`#232 CN4 0.68M`), so an object reads the same in both views.
+
+- The sphere is 8 cm, about a can's size, so it covers the object instead of
+  sitting inside it. It uses the image's bounding-box green.
+- The 5 cm label sits just above the sphere: the offset is half the sphere
+  plus half the text height.
+- **Stable marker IDs**: `target_id * 2` for the sphere, `+ 1` for the label.
+  RViz treats a marker ID as identity, so reusing a target's IDs on the next
+  publish updates the markers in place instead of piling up duplicates.
+- Faint, unlabeled 4 cm dots mark `potential_targets` in a separate
+  namespace, so a viewer can watch an object gather evidence before it's
+  confirmed.
 
 ### Association diagnostics: unthrottled, and conditional
 
@@ -228,7 +232,7 @@ def main() -> None:
     rclpy.init()
     node = SemanticMapNode()
     try:
-        rclpy.spin(node, executor=rclpy.executors.MultiThreadedExecutor())
+        rclpy.spin(node)
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
     finally:
@@ -238,12 +242,31 @@ def main() -> None:
             rclpy.shutdown()
 ```
 
-**Why a `MultiThreadedExecutor`**: `TFAdapter` waits up to 0.2 s inside
-`on_detections` for the detection stamp's transform to arrive. That only
-works if TF messages keep being delivered during the wait, which needs a
-second thread — the `TransformListener`'s reentrant callback group supplies
-the permission, the multi-threaded executor supplies the thread. See
-`08-tf_adapter.md`.
+**Why plain `rclpy.spin`, and where TF's thread comes from**: `TFAdapter`
+waits up to 0.2 s inside `on_detections` for the detection stamp's
+transform to arrive. That only works if TF keeps being delivered during
+the wait, which needs a second thread.
+
+- The `TransformListener` sits on its own node (`semantic_map_tf_listener`),
+  spun by `spin_tf` on a daemon thread with its own `SingleThreadedExecutor`.
+- **It must not share the main node.** rclpy gives a node one executor at a
+  time; `add_node` on a second executor removes it from the first. A shared
+  node would end up with every callback on one thread again.
+- **It ignores launch's global args** (`use_global_arguments=False`). The
+  launch file's `__node:=semantic_map` remap would otherwise rename it to
+  `semantic_map` too.
+- **Not tf2_ros's `spin_thread=True`**: its thread doesn't catch the
+  `ExternalShutdownException` raised when Ctrl-C shuts the context down
+  under it, so every shutdown printed a traceback. `spin_tf` catches it.
+- **Why not a `MultiThreadedExecutor`**: it cost ~40% of a core just
+  dispatching the 67 Hz `/tf` (measured 46% vs 9% on the robot,
+  2026-11-10).
+- `destroy_node` shuts down the listener's executor and destroys its node,
+  but **never joins the thread**: `rclpy.shutdown()` calls `destroy_node`
+  while holding the context lock, which the spin loop also needs, so a join
+  deadlocks. The thread is a daemon for the same reason.
+
+See `08-tf_adapter.md`.
 
 `node.save()` — a one-line wrapper around `semantic_persistence.save_semantic_map`
 — runs in `main`'s `finally`, so it fires on a clean shutdown *and* on

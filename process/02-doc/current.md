@@ -1,46 +1,93 @@
 # Current status
 
-**2026-11-05**. See `process/02-doc/history.md` for the completed-work log.
+**2026-11-12**. See `process/02-doc/history.md` for the completed-work log.
 
 ## Where I got to
 
-- **F35 power load test: done.** `tools/power_load_test.sh` works on the
-  robot. The first run was clean (worst 5.01 V, no undervoltage), but **the
-  OAK-D was at USB 2**, so it wasn't the worst case. Results are in
-  `power_testing.md`.
-- **F34 tracker config: code done, robot check (TF34.5) not run.**
+- **URDF fixed 2026-11-12, so TF33.0 is unblocked.** `dome2`'s URDF is now
+  generated from `dome2/config/dome3.durdf` with `~/durdf` (commit `46a4fe6`).
+  Measured: base_link 7 cm above the floor; camera lens at (0.13, 0, 0.075),
+  tilted 5° down (horizon-line calibration; the old rpy rolled the image 8°);
+  lidar at (−0.08, 0, 0.105), yaw −90° confirmed from `/scan`. Check with a
+  can at 1.00 m, raised so its centre was ~20 cm up: camera
+  (1.04, 0.05, 0.199), lidar front face at x 1.02, y ≈ 0.03. `dome_nav`'s sim
+  URDF, `dome`'s copy and `dome_vision`'s camera config were updated to
+  match (all committed).
 - **F33: only TF33.0's SLAM re-basing run is left** of the hardware
   verification. Detections → tracker → publish → persist → restore were all
   verified on 2026-10-23.
 
+## TF33.0 run, 2026-11-10
+
+**Setup**: on battery (not external power), OAK-D at USB 3, real SLAM
+(`online_async_launch.py`), `semantic.launch.py --map_name f33slam
+--publish_every_n 5`. The commands are in TF33.0's "Remaining" subsection.
+
+**What worked**:
+
+- SLAM came up; `map → camera_link` resolved about 2 s after start.
+- Rates: `/oak/detections_3d` 10.0 Hz, `/targets/markers` 2.0 Hz steady
+  (max gap 0.54 s).
+- Battery 11.71 → 11.69 V over a few minutes; `throttled=0x0`; 5 V rail
+  5.20 V; 52.7 °C. `/battery` current reads ~−0.04 A, which is not the
+  whole-robot draw (a known `dome2` issue).
+- Depth: the can read 1.43–1.45 m against a taped 1.50 m. That's within
+  stereo error, and the tape may have gone to the can's centre.
+
+**Why it paused**: the camera and lidar had moved, and the old camera rpy
+was wrong (an 8° roll about the optical axis). Both fixed 2026-11-12; see
+"Where I got to".
+
+**Findings to act on**:
+
+- **One can is detected as both `can` and `cup`** at the same 3D point
+  (`can` 0.91; `cup` 0.38–0.8, near `dome_vision`'s 0.35 cutoff). The
+  label-constrained tracker makes two targets. The cup detection comes and
+  goes, so its target is lost and re-created again and again; that's the
+  "markers blink" effect, and why IDs reached T11 with one can in view.
+  The fix belongs in `dome_vision`: suppress overlapping boxes across
+  classes. Quick test: `ros2 param set /dome_vision confidence 0.7`.
+- **The map forgets targets out of view.** Lost targets (5 s unseen) are
+  dropped from `/semantic/targets` and the markers; after 30 s
+  (`remove_timeout_s`) they're deleted. That doesn't fit go-to-label. A fix
+  changes the spec, so it would be a new feature.
+- **`f34test.json` is still empty** (`{"targets": []}`, dated Nov 9), even
+  though TF34.5 saw two cans on Nov 10. Check the save on a clean shutdown
+  of this run (`f33slam.json`).
+- **Semantic node CPU 42–48% of a core:** fixed; ~10% on the robot
+  (2026-11-11). See `history.md`.
+
 ## Open
 
-- **Repo state**: checkpoint 2026-11-05. F34 and F35 are committed and
-  pushed, along with `dome_vision` and `dome2`. 153 tests pass and ruff is
-  clean. ruff isn't installed on the robot; use
+- **Repo state**: checkpoint 2026-11-12. F34's close-out, the
+  `MultiThreadedExecutor` and RViz-marker chores are committed. 160 tests
+  pass and ruff is clean. ruff isn't installed on the robot; use
   `~/ros2_ws/src/dome_vision/.ruff-venv/bin/ruff`.
 - **Robot hardware state**:
   - The external USB hub is gone; the OAK-D plugs straight into the Pi.
-  - **The OAK-D only connects at USB 2** (kernel: "new high-speed", bus 4).
-    Its last USB 3 connection was through the hub, on 2026-10-24.
+  - **The OAK-D connects at USB 3 only in the bus 2/3 blue port.** The
+    other blue port (bus 4/5) falls back to USB 2. Keep it in bus 2/3.
+  - Check the speed only after firmware loads (`03e7:f63b`). The unbooted
+    bootloader (`03e7:2485`) always shows 480M.
   - The UPS's I2C isn't connected yet, so `/telemetry/battery` doesn't
     publish and the power test records no pack voltage.
   - Wi-Fi is on 5 GHz, to avoid USB 3 interference.
   - The 5 V rail reads 5.1–5.2 V at idle, up from ~5.0 V in October.
+- **Two `semantic_map` nodes run together**: `dome2`'s vision launch still
+  starts `dome_vision`'s old one beside ours. `dome_vision` F71 (drafted,
+  not approved) retires it; its gate is TF33.0's SLAM run.
+- **RViz markers** (`CN4` labels, 8 cm spheres) are built but not yet looked
+  at in RViz.
 
 ## Next steps, in order
 
-1. **Get the OAK-D onto USB 3**: the other blue port, the plug fully seated,
-   or another cable. Check with `journalctl -k | grep -iE "new .*speed"`;
-   you want "SuperSpeed" on `usb 3-` or `usb 5-`.
-2. **Rerun the power test** at USB 3 and add the result to `power_testing.md`.
-3. **TF34.5**: F34's demo, with two cans 0.5 m apart. Expect two targets and
-   `/targets/assoc_diag` publishing.
-4. **Commit**: run `/checkpoint` first (tests, ruff, literate docs).
-5. **TF33.0's last part**: run real SLAM to exercise re-basing.
-   slam_toolbox's `online_async_launch.py` directly, not
-   `robot_map.launch.py`, which also starts Nav2.
-6. **Then** TF33.8 Parts B/C, TF33.9 (Pi CPU), TF33.10 (docs).
+1. **Rerun TF33.0's SLAM re-basing run** on the fixed URDF (TF33.0
+   "Remaining" subsection). Confirm `f33slam.json` is written on shutdown.
+   Look at the new RViz markers during the run.
+2. **Then** TF33.8 Parts B/C, TF33.9 (Pi CPU), TF33.10 (docs). Decide
+   whether the "map forgets out-of-view targets" fix becomes a feature, and
+   raise the can/cup double label in `dome_vision`.
+3. **Approve or revise `dome_vision` F70/F71** once TF33.0 passes.
 
 **Planned: move the power testing to `dome2`.** It covers the whole robot,
 not the semantic map. Move `tools/power_load_test.sh`,

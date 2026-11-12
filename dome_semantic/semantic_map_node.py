@@ -26,12 +26,14 @@ and saved on shutdown (`save`, called from `main`'s `finally`).
 """
 
 import json
+import threading
 
 import rclpy
 import tf2_ros
 from builtin_interfaces.msg import Duration, Time
 from dome_semantic_msgs.msg import SemanticTarget, SemanticTargetArray
 from geometry_msgs.msg import Point, Vector3
+from rclpy.executors import ExternalShutdownException, SingleThreadedExecutor
 from rclpy.node import Node
 from std_msgs.msg import ColorRGBA, String
 from std_srvs.srv import Trigger
@@ -54,6 +56,29 @@ MAP_FRAME = "map"
 ODOM_FRAME = "odom"
 SCHEMA_VERSION = 1
 MARKER_LIFETIME = Duration(sec=2, nanosec=0)
+TARGET_SPHERE_DIAMETER_M = 0.08  # about a can's size, so it covers the object
+TARGET_LABEL_HEIGHT_M = 0.05
+POTENTIAL_SPHERE_DIAMETER_M = 0.04
+# Same green as dome_vision's bounding boxes, so the two views read alike.
+TARGET_COLOR = ColorRGBA(r=0.0, g=1.0, b=0.0, a=0.8)
+
+
+def sphere_scale(diameter_m: float) -> Vector3:
+    return Vector3(x=diameter_m, y=diameter_m, z=diameter_m)
+
+
+def short_label(canonical_class: str, target_id: int, profiles: dict) -> str:
+    """The name dome_vision's annotated image gives a world target, so RViz and
+    the image label an object the same way: the class profile's `abbrev` plus
+    the target ID (`CN4` for can target 4), or the first two letters
+    upper-cased when the class has no abbrev (dome_vision's fallback).
+    """
+    profile = profiles.get(canonical_class)
+    if profile is not None and profile.abbrev:
+        prefix = profile.abbrev
+    else:
+        prefix = canonical_class[:2].upper()
+    return f"{prefix}{target_id}"
 
 
 def make_marker(
@@ -87,7 +112,15 @@ class SemanticMapNode(Node):
             self.map_name, declare_tracker_config(self), self.get_logger().warning
         )
         self.tf_buffer = tf2_ros.Buffer()
-        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        # No global args: launch's __node remap would rename it to ours too.
+        self.tf_node = rclpy.create_node(
+            f"{self.get_name()}_tf_listener", use_global_arguments=False
+        )
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self.tf_node)
+        self.tf_executor = SingleThreadedExecutor()
+        self.tf_executor.add_node(self.tf_node)
+        self.tf_thread = threading.Thread(target=self.spin_tf, daemon=True)
+        self.tf_thread.start()
         self.adapter = TFAdapter(self.tf_buffer, CAMERA_FRAME, MAP_FRAME)
         self.last_map_t_odom: PlanarTransform | None = None
         self.frame_num = 0
@@ -187,52 +220,42 @@ class SemanticMapNode(Node):
     def publish_markers(self) -> None:
         stamp = self.get_clock().now().to_msg()
         array = MarkerArray()
-        label_z_offset = 0.08
+        label_z_offset_m = (TARGET_SPHERE_DIAMETER_M + TARGET_LABEL_HEIGHT_M) / 2
 
         for t in self.tracker.confirmed:
             if t.is_lost:
                 continue
             x, y, z = t.xyz_world
-            base_id = t.target_id * 3
-
             sphere = make_marker(
-                stamp, MAP_FRAME, "semantic_map", base_id, Marker.SPHERE
+                stamp, MAP_FRAME, "semantic_map", t.target_id * 2, Marker.SPHERE
             )
-            sphere.pose.position.x = x
-            sphere.pose.position.y = y
-            sphere.pose.position.z = z
-            sphere.scale = Vector3(x=0.03, y=0.03, z=0.03)
-            sphere.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=0.8)
+            sphere.pose.position = Point(x=x, y=y, z=z)
+            sphere.scale = sphere_scale(TARGET_SPHERE_DIAMETER_M)
+            sphere.color = TARGET_COLOR
             array.markers.append(sphere)
 
             text = make_marker(
-                stamp, MAP_FRAME, "semantic_map", base_id + 1, Marker.TEXT_VIEW_FACING
+                stamp,
+                MAP_FRAME,
+                "semantic_map",
+                t.target_id * 2 + 1,
+                Marker.TEXT_VIEW_FACING,
             )
-            text.pose.position.x = x
-            text.pose.position.y = y
-            text.pose.position.z = z + label_z_offset
-            text.scale.z = 0.12
+            text.pose.position = Point(x=x, y=y, z=z + label_z_offset_m)
+            text.scale.z = TARGET_LABEL_HEIGHT_M
             text.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
-            text.text = f"T{t.target_id} {t.canonical_class}/{t.observation_count}"
-            array.markers.append(text)
-
-            line = make_marker(
-                stamp, MAP_FRAME, "semantic_map", base_id + 2, Marker.LINE_STRIP
+            text.text = short_label(
+                t.canonical_class, t.target_id, self.tracker.profiles
             )
-            line.scale.x = 0.005
-            line.color = ColorRGBA(r=0.0, g=1.0, b=0.0, a=0.5)
-            line.points = [Point(x=x, y=y, z=z), Point(x=x, y=y, z=z + label_z_offset)]
-            array.markers.append(line)
+            array.markers.append(text)
 
         for pt in self.tracker.potential_targets:
             x, y, z = pt.xyz_world
             dot = make_marker(
                 stamp, MAP_FRAME, "semantic_map_potential", pt.target_id, Marker.SPHERE
             )
-            dot.pose.position.x = x
-            dot.pose.position.y = y
-            dot.pose.position.z = z
-            dot.scale = Vector3(x=0.02, y=0.02, z=0.02)
+            dot.pose.position = Point(x=x, y=y, z=z)
+            dot.scale = sphere_scale(POTENTIAL_SPHERE_DIAMETER_M)
             dot.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=0.5)
             array.markers.append(dot)
 
@@ -264,6 +287,30 @@ class SemanticMapNode(Node):
         response.message = "I see " + desc + "."
         return response
 
+    def spin_tf(self) -> None:
+        """Deliver TF on its own node and thread, so transforms keep arriving
+        while on_detections blocks waiting for one, without a
+        MultiThreadedExecutor (~40% of a core dispatching /tf).
+
+        Not tf2_ros's `spin_thread=True`: on a shared node, rclpy's
+        one-executor-per-node rule lets that executor steal this node, and its
+        thread doesn't catch the ExternalShutdownException raised on Ctrl-C.
+
+        destroy_node stops the executor but never joins this thread: rclpy's
+        shutdown calls destroy_node while holding the context lock, which the
+        spin loop also needs, so a join would deadlock. Daemon for the same
+        reason.
+        """
+        try:
+            self.tf_executor.spin()
+        except ExternalShutdownException:
+            pass
+
+    def destroy_node(self) -> None:
+        self.tf_executor.shutdown()
+        self.tf_node.destroy_node()
+        super().destroy_node()
+
     def save(self) -> None:
         path = save_semantic_map(self.tracker, self.map_name)
         self.get_logger().info(f"Semantic map saved to {path}")
@@ -273,9 +320,8 @@ def main() -> None:
     rclpy.init()
     node = SemanticMapNode()
     try:
-        # Multi-threaded so TF keeps arriving while on_detections waits for it.
-        rclpy.spin(node, executor=rclpy.executors.MultiThreadedExecutor())
-    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.save()

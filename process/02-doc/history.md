@@ -138,3 +138,15 @@ Append new entries here when marking work done in `current.md`.
   instead of the 5 V input (removed in `dome_vision` c21ad8d). First run:
   all seven stages clean, worst 5.01 V, but with the OAK-D at USB 2. 7 new
   tests; 153 pass.
+- **F34 close-out** (2026-11-10) — TF34.5's robot check passed: two `can`
+  targets 0.38 m apart at 0.85 m stayed separate with PASA on; rates
+  `/oak/detections_3d` 10.0 Hz, `/semantic/targets` 2.0 Hz; `throttled=0x0`.
+  Moved to `done/`.
+- **F35 USB 3 rerun** (2026-11-09) — OAK-D at USB 3 (10 Hz detection):
+  worst 5.14 V, no undervoltage, `throttled=0x0`.
+- **`MultiThreadedExecutor` chore** (2026-11-11) — TF on its own node and
+  thread; semantic node CPU ~10% of a core, down from 42–48%.
+- **RViz marker chore** (2026-11-11) — `CN4`-style labels matching
+  `dome_vision`'s image, 8 cm target spheres, no leader line.
+- **URDF fix in `dome2`** (2026-11-12) — unblocked TF33.0; see
+  `current.md` "Where I got to".

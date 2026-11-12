@@ -295,3 +295,33 @@ no lost pings. Cleanup left nothing running; the semantic map was saved.
   ~5.0 V), which leaves far more headroom.
 - **This isn't the worst case yet**: at USB 2 the OAK-D draws less and runs
   at 7.7 Hz instead of ~10 Hz. Rerun once it connects at USB 3.
+
+### 2026-11-09 16:45 — first run at USB 3
+
+**Setup**: OAK-D straight on the Pi, now at **USB 3** (`5000M`, kernel
+"new SuperSpeed" on `usb 3-1`). Wi-Fi on 5 GHz. Stages ran ~30 s each
+(stage spacing ~40 s), although `--hold 60` was intended. Pack voltage not
+recorded (UPS I2C still unconnected). Run dir: `~/power_tests/2026-11-09_164519/`.
+
+| Stage | Min 5 V | Mean 5 V | Det. rate | Worst ping |
+|---|---|---|---|---|
+| idle | 5.19 | 5.24 | — | 16.9 ms |
+| base | 5.18 | 5.23 | — | 19.9 ms |
+| cpu | 5.14 | 5.18 | — | 15.1 ms |
+| oak | 5.16 | 5.21 | — | 12.3 ms |
+| subscriber | 5.17 | 5.21 | 10.0 Hz | 19.3 ms |
+| semantic | 5.15 | 5.21 | 10.0 Hz | 16.4 ms |
+| worst_case | **5.14** | 5.16 | 10.0 Hz | 18.5 ms |
+
+**Outcome**: no dips below 4.80 V, no undervoltage events, `throttled=0x0`
+throughout, no lost pings. The two USB disconnects are expected: the
+bootloader-to-firmware re-enumeration in `oak` and the shutdown at the end.
+
+- **Finding the USB 3 fault**: the OAK-D connects at USB 3 only in the
+  blue port on bus 2/3. In the other blue port (bus 4/5) it fell back to
+  USB 2 with two cables and repeated reseats, and bus 5 logged no events.
+  **Keep the OAK-D in the bus 2/3 port.**
+- **Check speed only after firmware loads.** The unbooted bootloader
+  (`03e7:2485`) always enumerates at 480M. Look for `03e7:f63b`.
+- **The worst case has plenty of margin**: 5.14 V min against the 4.80 V
+  threshold, better than the USB 2 run's 5.01 V, at full 10 Hz detection.

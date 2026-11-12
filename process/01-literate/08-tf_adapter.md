@@ -92,11 +92,11 @@ the stamp's transform lands or the timeout expires.
 - **Why 0.2 s**: comfortably above the observed worst-case lag, yet short
   next to the ~10 fps detection rate's tolerance for a stale callback.
 - **The concurrency precondition**: the wait blocks inside the detection
-  callback, so TF messages must keep being delivered *meanwhile*. The node
-  spins in a `MultiThreadedExecutor`, and `TransformListener` subscribes in
-  its own `ReentrantCallbackGroup`, so TF callbacks run on another thread
-  while `on_detections` waits. Under a single-threaded executor the wait
-  would always time out.
+  callback, so TF messages must keep being delivered *meanwhile*. The
+  `TransformListener` lives on its own small node, spun by its own
+  `SingleThreadedExecutor` on a dedicated thread, so TF callbacks run while
+  `on_detections` waits on the main node's single-threaded executor.
+  Without that second thread the wait would always time out.
 - **The guard** is a late-arriving-TF regression test: the transform is
   added to a real buffer from another thread after the lookup has begun.
 

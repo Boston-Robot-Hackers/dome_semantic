@@ -39,7 +39,7 @@ dome_nav** — dome_nav must never gain a `dome_semantic_msgs` dependency.
 
 ## TF33.0 — Real-hardware verification: test the stack bottom-up
 
-**Status**: in progress — run notes in `process/02-doc/current.md`
+**Status**: in progress — SLAM re-basing run started 2026-11-10, paused until the URDF is updated for the moved camera and lidar. Run notes in `process/02-doc/current.md` ("TF33.0 run, 2026-11-10").
 
 TF33.1–TF33.6 are done but only unit-tested — never run against real OAK-D
 hardware. No combined launch exists yet (that's TF33.8), so verification is
@@ -88,6 +88,35 @@ echo /semantic/targets` for content; `/targets/assoc_diag` if
 
 **On shutdown**: check the persisted file matches what was seen live —
 `~/.dome/semantic_maps/<map_name>.json`.
+
+### Remaining: SLAM re-basing run
+
+Steps 1, 2 and 3 (real SLAM, not the static TF), then step 4 **without**
+`--static_map_odom`, from `~/ros2_ws`:
+
+```
+bl dome_semantic semantic.launch.py --map_name f33slam --publish_every_n 5
+```
+
+Checks (run `topic hz` in the background and stop it with
+`pkill -INT -f "topic hz"`; under `timeout` it prints nothing):
+
+```
+ros2 run tf2_ros tf2_echo map camera_link
+ros2 topic hz /oak/detections_3d &
+ros2 topic hz /semantic/targets &
+ros2 topic echo /semantic/targets --once
+```
+
+Procedure:
+
+- Get a target confirmed, then teleop around so SLAM corrects `map→odom`.
+- The target's `map` pose must stay on the real object; watch
+  `/targets/markers` in RViz.
+- After shutdown, compare `~/.dome/semantic_maps/f33slam.json` with what
+  was seen live.
+- Also note any duplicate targets while driving. That is early input for
+  TF33.8 Part C.
 
 **Test**: manual — real-robot run, findings recorded in `process/02-doc/current.md`.
 

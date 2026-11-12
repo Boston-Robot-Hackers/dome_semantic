@@ -16,8 +16,8 @@ moved here. This package only ever *compares* embedding vectors
 
 `dome_vision_ros/semantic_map_node.py` **still imports and runs**
 `dome_vision.world_tracker.WorldTracker` directly today — `dome_vision`'s
-copy is the live, currently-deployed tracker, not a stale fork. Four
-`dome_vision` features are **not done** and describe planned changes to
+copy is still in that repo, though the robot now runs this package's node.
+Four `dome_vision` features, all now **deferred**, describe planned changes to
 exactly the modules ported here (`world_tracker.py`, `targets.py`,
 `association.py`, `config.py`):
 
@@ -38,6 +38,7 @@ re-authored against `dome_semantic`'s own structure — not silently assumed
 to carry over, since by then this package's modules may already differ
 (TF33.3's map-frame re-basing, TF33.4's typed publishing).
 
-**How to apply**: before deleting `dome_vision`'s originals, check whether
-F39/F40/F56/F57 landed there in the meantime — if any did, decide then
-whether the same improvement is still wanted here.
+**How to apply**: `dome_vision` F71 (retire the semantic layer) does the
+deletion; its TF71.0 checks whether F39/F40/F56/F57 landed there in the
+meantime. If any did, decide then whether the same improvement is still
+wanted here.

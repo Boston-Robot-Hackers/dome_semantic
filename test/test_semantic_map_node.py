@@ -14,7 +14,7 @@ import rclpy
 import tf2_ros
 from builtin_interfaces.msg import Time as RosTime
 from geometry_msgs.msg import Point, TransformStamped
-from rclpy.executors import MultiThreadedExecutor
+from rclpy.executors import SingleThreadedExecutor
 from std_msgs.msg import Header
 from std_srvs.srv import Trigger
 from tf2_msgs.msg import TFMessage
@@ -24,6 +24,7 @@ from vision_msgs.msg import (
     Detection3DArray,
     ObjectHypothesisWithPose,
 )
+from visualization_msgs.msg import Marker
 
 from dome_semantic.map_rebasing import PlanarTransform
 from dome_semantic.targets import ConfirmedTarget
@@ -355,7 +356,8 @@ def wait_until(condition, timeout_s: float) -> bool:
 
 def test_detection_waits_for_tf_arriving_after_it():
     """Odometry TF lags detection stamps on the robot; on_detections must be
-    able to wait for it, so TF callbacks have to run while it blocks.
+    able to wait for it, so TF callbacks have to run while it blocks — even
+    with the node on a single-threaded executor (the listener's own thread).
     """
     from dome_semantic.semantic_map_node import SemanticMapNode
 
@@ -363,7 +365,7 @@ def test_detection_waits_for_tf_arriving_after_it():
     source = rclpy.create_node("tf_and_detection_source")
     tf_pub = source.create_publisher(TFMessage, "/tf", 10)
     det_pub = source.create_publisher(Detection3DArray, "/oak/detections_3d", 10)
-    executor = MultiThreadedExecutor()
+    executor = SingleThreadedExecutor()
     executor.add_node(node)
     spinner = threading.Thread(target=executor.spin)
     spinner.start()
@@ -388,3 +390,58 @@ def test_detection_waits_for_tf_arriving_after_it():
         spinner.join()
         source.destroy_node()
         node.destroy_node()
+
+
+def test_main_spins_node_single_threaded():
+    """A MultiThreadedExecutor cost ~40% of a core dispatching /tf; main must
+    use plain rclpy.spin and leave TF to the listener's own thread.
+    """
+    from dome_semantic import semantic_map_node
+
+    fake_node = MagicMock()
+    with (
+        patch.object(semantic_map_node, "SemanticMapNode", return_value=fake_node),
+        patch.object(semantic_map_node.rclpy, "init"),
+        patch.object(semantic_map_node.rclpy, "ok", return_value=False),
+        patch.object(semantic_map_node.rclpy, "spin") as spin,
+    ):
+        semantic_map_node.main()
+    spin.assert_called_once_with(fake_node)
+    fake_node.save.assert_called_once()
+
+
+def test_short_label_uses_profile_abbrev():
+    from dome_semantic.semantic_map_node import short_label
+
+    profiles = {"can": MagicMock(abbrev="CN")}
+    assert short_label("can", 4, profiles) == "CN4"
+
+
+def test_short_label_falls_back_to_first_two_letters():
+    from dome_semantic.semantic_map_node import short_label
+
+    profiles = {"cup": MagicMock(abbrev=None)}
+    assert short_label("cup", 12, profiles) == "CU12"
+    assert short_label("bottle", 3, {}) == "BO3"
+
+
+def test_publish_markers_labels_target_like_annotated_image(node):
+    node.publish_every_n = 1
+    node.tf_buffer.lookup_transform.return_value = make_transform_stamped()
+    node.tf_buffer.transform.return_value = make_point_result(1.0, 2.0, 0.0)
+    node.pub_markers = MagicMock()
+
+    for i in range(6):
+        node.on_detections(make_detections([(0.1, 0.1, 1.0, "can", 7)], sec=1 + i))
+    with patch.dict(node.tracker.profiles, {"can": MagicMock(abbrev="CN")}):
+        node.publish_markers()
+
+    markers = node.pub_markers.publish.call_args.args[0].markers
+    confirmed = [m for m in markers if m.ns == "semantic_map"]
+    assert [m.type for m in confirmed] == [Marker.SPHERE, Marker.TEXT_VIEW_FACING]
+    sphere, text = confirmed
+    assert sphere.scale.x == pytest.approx(0.08)
+    assert (sphere.color.r, sphere.color.g, sphere.color.b) == (0.0, 1.0, 0.0)
+    assert text.text == "CN1"
+    assert text.scale.z == pytest.approx(0.05)
+    assert text.pose.position.z > sphere.pose.position.z
