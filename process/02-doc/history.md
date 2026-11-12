@@ -150,3 +150,9 @@ Append new entries here when marking work done in `current.md`.
   `dome_vision`'s image, 8 cm target spheres, no leader line.
 - **URDF fix in `dome2`** (2026-11-12) — unblocked TF33.0; see
   `current.md` "Where I got to".
+
+**2026-11-12** — URDF fixed in `dome2` (commit `46a4fe6`, generated from
+`dome2/config/dome3.durdf`): camera lens at (0.13, 0, 0.075) tilted 5° down,
+lidar at (−0.08, 0, 0.105) yaw −90°. Verified live: `map → camera_link` at
+rest (0.130, 0, 0.145), RPY (−95°, 0, −90°). `dome_nav`, `dome` and
+`dome_vision` copies updated to match.

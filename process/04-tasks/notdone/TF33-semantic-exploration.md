@@ -39,7 +39,10 @@ dome_nav** — dome_nav must never gain a `dome_semantic_msgs` dependency.
 
 ## TF33.0 — Real-hardware verification: test the stack bottom-up
 
-**Status**: in progress — SLAM re-basing run started 2026-11-10, paused until the URDF is updated for the moved camera and lidar. Run notes in `process/02-doc/current.md` ("TF33.0 run, 2026-11-10").
+**Status**: in progress — SLAM re-basing run **failed 2026-11-12**: the same
+can returns 0.36 m off after a loop and gets a new ID. Root cause is the
+re-basing design (TF33.3), fixed by F36 (approved). Rerun after F36. Run notes
+in `process/02-doc/current.md` ("TF33.0 run, 2026-11-12").
 
 TF33.1–TF33.6 are done but only unit-tested — never run against real OAK-D
 hardware. No combined launch exists yet (that's TF33.8), so verification is

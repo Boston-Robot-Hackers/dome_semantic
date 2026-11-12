@@ -1,68 +1,84 @@
 # Current status
 
-**2026-11-12**. See `process/02-doc/history.md` for the completed-work log.
+**2026-11-12, evening**. See `process/02-doc/history.md` for the
+completed-work log.
 
 ## Where I got to
 
-- **URDF fixed 2026-11-12, so TF33.0 is unblocked.** `dome2`'s URDF is now
-  generated from `dome2/config/dome3.durdf` with `~/durdf` (commit `46a4fe6`).
-  Measured: base_link 7 cm above the floor; camera lens at (0.13, 0, 0.075),
-  tilted 5° down (horizon-line calibration; the old rpy rolled the image 8°);
-  lidar at (−0.08, 0, 0.105), yaw −90° confirmed from `/scan`. Check with a
-  can at 1.00 m, raised so its centre was ~20 cm up: camera
-  (1.04, 0.05, 0.199), lidar front face at x 1.02, y ≈ 0.03. `dome_nav`'s sim
-  URDF, `dome`'s copy and `dome_vision`'s camera config were updated to
-  match (all committed).
-- **F33: only TF33.0's SLAM re-basing run is left** of the hardware
-  verification. Detections → tracker → publish → persist → restore were all
-  verified on 2026-10-23.
+- **TF33.0's SLAM re-basing run failed on 2026-11-12, and the cause is the
+  re-basing design.** The same unmoved can comes back 0.36 m off after a
+  loop, so it gets a new ID each time. See "TF33.0 run, 2026-11-12".
+- **F36 (approved 2026-11-12) is the fix**: drop global re-basing, widen
+  can re-association, add a same-label merge pass, and keep out-of-view
+  targets. TF33.0 stays open until a re-run passes with F36.
+- **URDF fixed 2026-11-12**; see `history.md`.
 
-## TF33.0 run, 2026-11-10
+## TF33.0 run, 2026-11-12
 
-**Setup**: on battery (not external power), OAK-D at USB 3, real SLAM
-(`online_async_launch.py`), `semantic.launch.py --map_name f33slam
---publish_every_n 5`. The commands are in TF33.0's "Remaining" subsection.
+**Setup**: battery, OAK-D on USB 3 (bus 2/3), real SLAM, map names
+`f33slam` → `f33slam2` → `f33slam4` (restarted twice; see below).
 
-**What worked**:
+**Result: fail.** In `f33slam4`, baseline T1 `can` at map (1.36, 0.22) with
+`map → odom` (0.19, −0.07, −2.4°). After a loop, the same can came back as
+T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°).
 
-- SLAM came up; `map → camera_link` resolved about 2 s after start.
-- Rates: `/oak/detections_3d` 10.0 Hz, `/targets/markers` 2.0 Hz steady
-  (max gap 0.54 s).
-- Battery 11.71 → 11.69 V over a few minutes; `throttled=0x0`; 5 V rail
-  5.20 V; 52.7 °C. `/battery` current reads ~−0.04 A, which is not the
-  whole-robot draw (a known `dome2` issue).
-- Depth: the can read 1.43–1.45 m against a taped 1.50 m. That's within
-  stereo error, and the tape may have gone to the can's centre.
+- **0.36 m apart**, beyond the can's 0.15 m `drift_tolerance_m`, so each
+  return is a new ID. The current view was always self-consistent.
+- In `f33slam`, the same can moved 1.9 m, (1.44, −0.08) → (0.49, −1.70),
+  with `map → odom` grown to (−0.12, 0.97, −25°). **Odometry drifts a lot.**
+- The node logged `map->odom jumped; re-based stored targets.` at 17:26:47
+  (twice) and 17:27:39 — inside the baseline window and mid-loop.
 
-**Why it paused**: the camera and lidar had moved, and the old camera rpy
-was wrong (an 8° roll about the optical axis). Both fixed 2026-11-12; see
-"Where I got to".
+**Architect review of re-basing** (`map_rebasing.py`,
+`semantic_map_node.py:152-162`):
 
-**Findings to act on**:
+- **Re-basing is wrong as built.** slam_toolbox steps `map → odom` to absorb
+  odometry drift since its last graph node; that says nothing about where a
+  target already transformed at its own stamp is. Re-basing adds the
+  robot's *later* drift to an *earlier* observation, pinning targets to
+  `odom`. It's only right after a loop closure, and then only locally.
+- The 5 cm / 0.02 rad gate absorbs small steps and applies big ones, so
+  what a target inherits is arbitrary.
+- Replaying the logged values: re-basing moved T1 to 0.42 m from T33, so it
+  **made this miss worse by ~0.06–0.1 m**. The other ~0.3 m is most likely
+  SLAM pose plus OAK-D depth error, so 0.15 m is too tight a radius.
 
-- **One can is detected as both `can` and `cup`** at the same 3D point
-  (`can` 0.91; `cup` 0.38–0.8, near `dome_vision`'s 0.35 cutoff). The
-  label-constrained tracker makes two targets. The cup detection comes and
-  goes, so its target is lost and re-created again and again; that's the
-  "markers blink" effect, and why IDs reached T11 with one can in view.
-  The fix belongs in `dome_vision`: suppress overlapping boxes across
-  classes. Quick test: `ros2 param set /dome_vision confidence 0.7`.
-- **The map forgets targets out of view.** Lost targets (5 s unseen) are
-  dropped from `/semantic/targets` and the markers; after 30 s
-  (`remove_timeout_s`) they're deleted. That doesn't fit go-to-label. A fix
-  changes the spec, so it would be a new feature.
-- **`f34test.json` is still empty** (`{"targets": []}`, dated Nov 9), even
-  though TF34.5 saw two cans on Nov 10. Check the save on a clean shutdown
-  of this run (`f33slam.json`).
-- **Semantic node CPU 42–48% of a core:** fixed; ~10% on the robot
-  (2026-11-11). See `history.md`.
+**Other findings**:
+
+- **`f33slam.json` from 11-10 was saved correctly** (T9, 8021 obs) and was
+  restored on start. Persistence is keyed only by `--map_name`, so reusing
+  a name with a fresh SLAM map silently restores targets in a dead frame.
+- **IDs count potentials, not targets** (`world_tracker.py:162,176`), so
+  CN51 after a few minutes is noise candidates, not 50 confirmed targets.
+- **EKF stalled for 10.65 s** at 17:06:45 ("Failed to meet update rate").
+  Load, temperature, memory and throttling were all fine. Unexplained; a
+  DDS publish blocking on the laptop's RViz over Wi-Fi is one suspect. A
+  `dome2` issue.
+- **The semantic node stopped publishing once** (`f33slam3`): detections in
+  at 8 Hz, nothing out on `/semantic/targets` or `/targets/markers`, all
+  threads waiting on futexes, ~8% CPU. Gone after restarting everything;
+  not reproduced. If it recurs, don't kill it — take a `py-spy dump`.
+- **No can/cup double label this run.**
+- **Markers are too small at map zoom** (8 cm sphere, true size), and
+  marker topics are `/targets/*` while targets are `/semantic/*`. Both
+  are proposed chores.
+- The map being mostly −1 is normal: unseen cells inside SLAM's bounding
+  box.
+
+## TF33.0 run, 2026-11-10 (still open)
+
+- **One can was detected as both `can` and `cup`** at the same point, making
+  two targets and blinking markers. Not seen on 11-12. The fix belongs in
+  `dome_vision` (cross-class box suppression); quick test:
+  `ros2 param set /dome_vision confidence 0.7`.
+- Depth read 1.43–1.45 m against a taped 1.50 m: within stereo error.
 
 ## Open
 
-- **Repo state**: checkpoint 2026-11-12. F34's close-out, the
-  `MultiThreadedExecutor` and RViz-marker chores are committed. 160 tests
-  pass and ruff is clean. ruff isn't installed on the robot; use
-  `~/ros2_ws/src/dome_vision/.ruff-venv/bin/ruff`.
+- **Repo state**: checkpoint 2026-11-12 (evening). Docs only since the
+  last commit: the TF33.0 run write-up, F36/TF36 (approved), two proposed
+  chores, bag replay notes. 160 tests pass and ruff is clean. ruff isn't
+  installed on the robot; use `~/ros2_ws/src/dome_vision/.ruff-venv/bin/ruff`.
 - **Robot hardware state**:
   - The external USB hub is gone; the OAK-D plugs straight into the Pi.
   - **The OAK-D connects at USB 3 only in the bus 2/3 blue port.** The
@@ -76,18 +92,29 @@ was wrong (an 8° roll about the optical axis). Both fixed 2026-11-12; see
 - **Two `semantic_map` nodes run together**: `dome2`'s vision launch still
   starts `dome_vision`'s old one beside ours. `dome_vision` F71 (drafted,
   not approved) retires it; its gate is TF33.0's SLAM run.
-- **RViz markers** (`CN4` labels, 8 cm spheres) are built but not yet looked
-  at in RViz.
+- **RViz markers** were seen on 2026-11-12: they work but are nearly
+  invisible at map zoom (proposed chore).
+- **`dome2` issues found on 2026-11-12**: odometry drifts a lot (SLAM
+  corrected 1 m and 25° in one session), and the EKF once stalled for
+  10.65 s. Raise both in `dome2`.
+- **Semantic node stopped publishing once** on 2026-11-12, not reproduced.
+  If it recurs, keep it running and take a stack dump (`py-spy` isn't
+  installed yet).
 
 ## Next steps, in order
 
-1. **Rerun TF33.0's SLAM re-basing run** on the fixed URDF (TF33.0
-   "Remaining" subsection). Confirm `f33slam.json` is written on shutdown.
-   Look at the new RViz markers during the run.
-2. **Then** TF33.8 Parts B/C, TF33.9 (Pi CPU), TF33.10 (docs). Decide
-   whether the "map forgets out-of-view targets" fix becomes a feature, and
-   raise the can/cup double label in `dome_vision`.
-3. **Approve or revise `dome_vision` F70/F71** once TF33.0 passes.
+1. **F36 approved 2026-11-12. Next: TF36.0, record the drive bag** on the
+   robot (commands in `notes.md`, "Bag replay of a drive"). Restart the whole
+   stack first so the robot starts at map (0, 0); tape the distance from the
+   wheel axle midpoint to the can's centre, straight ahead. Hold 10 s, then
+   2–3 loops with the can out of view for over 30 s. A throwaway
+   `/semantic/targets` bag summarizer was written in session scratch; re-create
+   it for the replay (one row per ID: pose, obs count, time seen, tape error).
+2. **Build F36, then rerun TF33.0's SLAM run** with it. Pass: the same can
+   keeps its ID, or lands within the new radius, across loops.
+3. **Then** TF33.8 Parts B/C, TF33.9 (Pi CPU), TF33.10 (docs). Raise the
+   can/cup double label and the 10 s EKF stall in their own packages.
+4. **Approve or revise `dome_vision` F70/F71** once TF33.0 passes.
 
 **Planned: move the power testing to `dome2`.** It covers the whole robot,
 not the semantic map. Move `tools/power_load_test.sh`,

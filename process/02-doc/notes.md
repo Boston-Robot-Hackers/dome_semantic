@@ -42,3 +42,31 @@ to carry over, since by then this package's modules may already differ
 deletion; its TF71.0 checks whether F39/F40/F56/F57 landed there in the
 meantime. If any did, decide then whether the same improvement is still
 wanted here.
+
+## Bag replay of a drive (TF36)
+
+Used to compare tracker changes on identical TF and detections, so SLAM's
+run-to-run variance drops out.
+
+**Record** on the robot, with drivers, OAK-D detection only and real SLAM
+running (the recorder subscribes to `/oak/detections_3d`, so the vision node
+runs inference even without the semantic node):
+
+```
+ros2 bag record -o ~/bags/<name> /tf /tf_static /oak/detections_3d /odom /scan
+```
+
+**Replay** with the live stack stopped (no drivers, SLAM or vision — the bag
+supplies their TF). Use a fresh `map_name` each time, so nothing is restored
+from an earlier save. Three terminals, from `~/ros2_ws`:
+
+```
+ros2 run dome_semantic semantic_map_node --ros-args -r __node:=semantic_map \
+  -p use_sim_time:=true -p map_name:=<replay_name> \
+  -p class_profile_path:=$(ros2 pkg prefix dome_semantic)/share/dome_semantic/config/class_profiles.yaml \
+  --params-file $(ros2 pkg prefix dome_semantic)/share/dome_semantic/config/semantic_map.yaml
+ros2 bag record -o ~/bags/<replay_name> /semantic/targets
+ros2 bag play ~/bags/<name> --clock
+```
+
+Stop the recorder and the node once play ends.

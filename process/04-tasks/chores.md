@@ -42,3 +42,11 @@ Simple bug fixes and refactors (no spec/behavior change). One line each:
   power load test, linked from `power_system_testing.md` step 2, so the
   procedure and the 2026-11-05 lessons (USB 2 fallback, USB 3 Wi-Fi
   interference) aren't lost in `current.md`.
+- [ ] Make RViz target markers visible at map zoom (sphere ~0.25 m, label
+  ~0.15 m) instead of true can size; on 2026-11-12 the 8 cm sphere was
+  nearly invisible in RViz.
+- [ ] Rename `/targets/markers` and `/targets/assoc_diag` to
+  `/semantic/markers` and `/semantic/assoc_diag`, so everything this
+  package publishes shares one prefix and can't collide with
+  `dome_vision`'s old `semantic_map` node (same node name, same marker
+  topic). Update the docs and RViz config that name them.
