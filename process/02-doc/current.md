@@ -282,12 +282,13 @@ T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°)
 
 ## Next steps, in order
 
-1. **Raise in their own packages**:
-   - **`dome_vision`**: depth error on small objects past ~2 m, the can/cup
-     double label, and steady false cups.
-   - **`dome_nav`**: the `/cmd_vel` type mismatch and the `bt_navigator`
-     `error_code_names` crash.
-   - **`dome2`**: odometry drift and the 10 s EKF stall.
+1. ~~Raise in their own packages~~: filed 2026-11-13, not yet committed
+   in those repos:
+   - **`dome_vision`**: I04 (depth error on small objects at ~2 m), I05
+     (can/cup double label and steady false cups).
+   - **`dome_nav`**: I13 (real params not migrated to Kilted: `/cmd_vel`
+     type mismatch and `bt_navigator` crash).
+   - **`dome2`**: I01 (odometry drift), I02 (10 s EKF stall).
 2. **Decide on false confirmations**, which are now permanent. Candidates:
    drop lost targets with few observations, or widen the cup radii. Needs
    its own feature.

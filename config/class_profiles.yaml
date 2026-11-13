@@ -1,5 +1,5 @@
 # Class profiles for PASA association on the robot.
-# Values copied from dome_vision's roboflow_oak.yaml (world_tracker.class_profiles_inline),
+# Values originally copied from dome_vision's world_tracker config (retired there by its F71),
 # except the can's drift_tolerance_m and merge_radius_m, widened by F36.
 # canonical_class is the label published on /semantic/targets, and dome_mission matches it
 # exactly ("nav go can"), so keep it short.

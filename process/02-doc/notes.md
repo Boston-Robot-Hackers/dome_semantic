@@ -12,38 +12,19 @@ It deliberately does **not** need `torch`/`torchvision`/`cv2`: those belong to
 moved here. This package only ever *compares* embedding vectors
 (`embedding_similarity.cosine_sim`), never *extracts* them.
 
-## Watch list: dome_vision features targeting the ported code
+## Watch list: dome_vision features targeting the ported code (resolved)
 
-`dome_vision_ros/semantic_map_node.py` **still imports and runs**
-`dome_vision.world_tracker.WorldTracker` directly today — `dome_vision`'s
-copy is still in that repo, though the robot now runs this package's node.
-Four `dome_vision` features, all now **deferred**, describe planned changes to
-exactly the modules ported here (`world_tracker.py`, `targets.py`,
-`association.py`, `config.py`):
+**Resolved 2026-11-13 by `dome_vision` F71**, which deleted that repo's copy of
+the tracker (`world_tracker.py`, `semantic_map_node.py`, `tf_adapter`, class
+profiles). **This package is now the only semantic map.**
 
-- **F39** — duplicate confirmed-target collapse (post-confirmation merge pass)
-- **F40** — `/odom_raw`-based stopped detection for a tighter association radius
-- **F56** — split `WorldTracker` into `target_store.py`/`target_stats.py`/`target_serializer.py`
-- **F57** — consolidate the `PotentialTarget`/`ConfirmedTarget` data model
-
-**Why this matters here**: F33's stated intent is a one-way migration —
-*"dome_vision keeps OAK/depth/detection publishing; the map/tracker moves"*
-(TF33.2). Once this package's own ROS node (TF33.3/TF33.4) is built and
-proven,
-`dome_vision`'s `semantic_map_node.py` gets retired and its
-`world_tracker.py`/`association.py`/etc. get deleted. At that point these
-four features become moot *in dome_vision* (their target file will be gone).
-If the underlying improvements are still wanted, they'd need to be
-re-authored against `dome_semantic`'s own structure — not silently assumed
-to carry over, since by then this package's modules may already differ
-(TF33.4's typed publishing; F36's no-re-basing, kept lost targets and
-merge pass). **F39's merge idea is already done here** by F36's
-`target_merge.py`, without F39's size gate.
-
-**How to apply**: `dome_vision` F71 (retire the semantic layer) does the
-deletion; its TF71.0 checks whether F39/F40/F56/F57 landed there in the
-meantime. If any did, decide then whether the same improvement is still
-wanted here.
+- `dome_vision` F39, F40, F56 and F57 (merge pass, `/odom_raw` stopped
+  detection, `WorldTracker` split, target data model) never landed there and
+  are moot. Re-author them here if still wanted; **F39's merge idea is
+  already done** by F36's `target_merge.py`.
+- `dome_control`'s `behavior_manager` and `dome_vision`'s image node now read
+  this package's `config/class_profiles.yaml` and `/semantic/targets`, so
+  changes to either reach them.
 
 ## Bag replay of a drive (TF36)
 
