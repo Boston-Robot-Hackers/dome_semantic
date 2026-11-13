@@ -4,6 +4,8 @@
 
 ## Where I got to
 
+- **Paused 2026-11-13 mid TF36.7 re-run** to charge the battery; resume
+  from "Next steps", step 1.
 - **TF36.0 done 2026-11-13**: drive bag recorded and replayed through the
   current node. **The can's new ID came from the remove timeout, not
   drift.** See "TF36.0 bag replay, 2026-11-13".
@@ -14,6 +16,35 @@
   can re-association, add a same-label merge pass, and keep out-of-view
   targets. TF33.0 stays open until a re-run passes with F36.
 - **URDF fixed 2026-11-12**; see `history.md`.
+
+## TF36.7 robot run, 2026-11-13
+
+**Setup**: full stack, real SLAM, map `f36run`, bag `~/bags/f36run`
+(338 s, includes `/semantic/targets`). Two cans: the taped one straight
+ahead, a second ~2 m to the left at about the same distance ahead. The
+robot drove ~80–170 s, then sat still at map ≈ (0.0, 1.44), facing −44°.
+
+**The tracker passed:**
+
+- **T1** (taped can, (1.10, −0.14), 991 obs) **kept its ID** after
+  ~210 s out of view, re-seen from a new viewpoint, and moved 0.02 m.
+- **T5** at (1.31, 1.93) is the second can.
+- All 12 targets were saved, most of them lost by shutdown.
+
+**But the taped can also became T27** at (1.26, −0.94), 889 obs, 0.82 m
+from T1. **The cause is depth, not the tracker**:
+
+- From the stopped robot, detections of one can (one track, id 30) at one
+  bearing flicker in range: **~85% at ~2.6 m, a few at ~2.0 m**.
+- 2.0 m is the range to T1 from that pose, so the pose is right and the
+  2.6 m mode is ~0.6 m of depth error at ~2.6 m. Likely `dome_vision`
+  sampling depth from behind a 6.6 cm can at that range.
+- No association radius should absorb 0.6 m; the fix belongs in
+  `dome_vision` (depth on small, distant objects), or a max-range gate.
+
+**Other**: can T23 + cup T24 at (0.51, 1.36), ~0.5 m in front of the stop
+pose, match no real can (ghost / double label); 7 cup IDs, several with
+7–15 obs. **No full loops were driven**: one ~90 s drive, then stationary.
 
 ## TF36.0 bag replay, 2026-11-13
 
@@ -172,6 +203,10 @@ T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°)
 
 ## Open
 
+- **RESUME HERE (paused 2026-11-13 to charge the battery)**: TF36.7
+  re-run. Check `~/bags/f36run3` first (recorded mid-session, may be
+  partial), then follow "TF36.7 re-run procedure" with map name
+  `f36run4`. See "Next steps", step 1.
 - **Repo state**: F36 TF36.0–TF36.6 committed 2026-11-13, literate docs
   refreshed (chapter 09 is now `target_merge`). 153 tests pass and ruff is
   clean. ruff isn't installed on the robot; use
@@ -197,26 +232,34 @@ T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°)
   corrected 1 m and 25° in one session), and the EKF once stalled for
   10.65 s. Raise both in `dome2`.
 - **`/cmd_vel` type mismatch** found 2026-11-13: `collision_monitor`
-  publishes `TwistStamped`, `gendrv` subscribes `Twist`. Raise in
-  `dome2`/`dome_nav`.
+  publishes `TwistStamped`, `gendrv` subscribes `Twist`. **Cause**:
+  `dome_nav`'s `nav2_params_real.yaml` (loaded by `robot_map.launch.py`)
+  lacks `enable_stamped_cmd_vel: false`, which the explore params files
+  already set for Kilted. Also missing in `nav2_params_localization_real.yaml`
+  and `nav2_params_explore_real_mini.yaml`. Fix in `dome_nav`.
+- **Nav2 `bt_navigator` dies at startup** (2026-11-13, Kilted): params
+  still set `error_code_names`, which must be replaced by
+  `error_code_name_prefixes`. Nav2 navigation is down until `dome_nav`'s
+  params are fixed; teleop is unaffected. Raise in `dome_nav`.
 - **Semantic node stopped publishing once** on 2026-11-12, not reproduced.
   If it recurs, keep it running and take a stack dump (`py-spy` isn't
   installed yet).
 
 ## Next steps, in order
 
-1. **TF36.0–TF36.6 done and committed 2026-11-13**; can
-   `drift_tolerance_m` and `merge_radius_m` are both 0.40 m, merge pass in
-   `target_merge.py`, confirmed targets never deleted (`remove_timeout_s`
-   gone). **Next: TF36.7**, the robot run (= TF33.0 re-run): 2–3 real
-   passes past the can, out of view for over 30 s each. `world_tracker.py` is 393 lines, over the ~300 soft cap
-   (`dome_vision` F56's split, never ported). **Two real cans closer than
-   0.4 m will now merge**; the shipped-config test keeps 0.5 m apart. Replays use
-   `~/bags/f36drive`; the summarizer and TF sampler lived in session
-   scratch, so re-create them (one row per ID: pose, obs count, time seen,
-   tape error vs map (−1.0, 0.0)). **Read the start yaw from the bag before
-   computing the tape point.**
-2. **Build the rest of F36, then rerun TF33.0's SLAM run** with it. Pass:
+1. **Resume here: TF36.7 re-run (= TF33.0 re-run).** TF36.0–TF36.6 are
+   done and committed (`453ad90`). The first robot run (`f36run`) passed
+   for the tracker but the taped can also became T27 from depth error at
+   ~2.6 m (see "TF36.7 robot run"). **Before re-running, check
+   `~/bags/f36run3`** (recording started 11:29 on 11-13, session ended
+   mid-run): if it holds three full loops, analyze it instead of
+   re-running. **Use the next unused name, `f36run4`**: `f36run2`/`f36run3`
+   already have SLAM pose graphs and bags, and reusing a name restores them.
+   See "TF36.7 re-run procedure" below.
+2. **Then**: write the result up, close TF36.7 (and TF33.0 if it passes),
+   close F36 with `/close-feature 36`. Raise in `dome_vision`: depth error
+   on small objects past ~2 m, and the can/cup double label.
+3. **Build the rest of F36, then rerun TF33.0's SLAM run** with it. Pass:
    the same can keeps its ID, or lands within the new radius, across loops.
    Drive 2–3 real passes past the can this time.
 3. **Then** TF33.8 Parts B/C, TF33.9 (Pi CPU), TF33.10 (docs). Raise the
@@ -234,6 +277,47 @@ whether this needs a feature there.
 **TF33.7 (fake detection producer)** is designed but deferred. Build it
 only if hardware stays unavailable. The design was never committed, so
 re-derive it.
+
+## TF36.7 re-run procedure
+
+**Setup**: one can only, no others nearby. Stop everything, then place the
+robot **1.0 m from the can, facing it** (wheel axle midpoint to can
+centre). Start fresh so the robot is at map (0, 0); tape point is then map
+(1.0, 0.0) — confirm the start yaw from the bag.
+
+**Terminals**, each from `~/ros2_ws`, in order:
+
+```
+bl dome2 robot.launch.py --options "d b"
+bl dome_nav robot_map.launch.py --map_name f36run4
+bl dome_vision_ros dome_vision_ros.launch.py --config "$DOME_VISION_CONFIG" --depth true
+bl dome_semantic semantic.launch.py --map_name f36run4
+ros2 bag record -o ~/bags/f36run4 /tf /tf_static /oak/detections_3d /odom /scan /semantic/targets
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+**Drive**: hold 10 s facing the can. Three loops, each with the can out of
+view for over 30 s, then face it again **from within ~1.5 m** (depth went
+bad at ~2.6 m) and hold 10 s. Finish facing it at ~1 m, hold 10 s.
+
+**Stop in this order**: semantic launch first (it saves the map), then the
+bag, then the rest. Claude reads `~/.dome/semantic_maps/f36run4.json` and
+the bag directly.
+
+**Pass**: one can ID through all loops, no second can ID, position within
+0.4 m of first recorded.
+
+**Startup noise that is harmless**: `RTPS_TRANSPORT_SHM ... port7006`,
+early `Message Filter dropping message: frame 'laser'`, and
+`Legacy map export failed` from `slam_manager`'s one-off `map_saver`.
+
+**Teleop stutters** (moves ½ s, pauses, goes): firmware stops the motors
+after 200 ms with no command (`~/linorobot2_hardware/firmware/src/firmware.cpp:202`),
+and the VMware text console's key repeat is slow and uneven (measured
+~500 ms first gap, gaps up to ~940 ms). GNOME settings don't apply on a
+`tty`. **Not fixing it** (a relay was rejected as too hairy); a gamepad
+with `joy_teleop`, or SSH from a real desktop terminal, avoids it. It
+doesn't affect the test.
 
 ## Commands
 
