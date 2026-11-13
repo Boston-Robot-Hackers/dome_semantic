@@ -27,10 +27,9 @@ was:
 4. ~~TF35 T06/T07~~ — *done*: dome_nav cleanup, `ExploreArea` action server,
    top-level launch, live sim bring-up verified 2026-08-01.
 5. ~~TF33.6~~ — *done (2026-08-03)*: persistence keyed to SLAM map identity.
-6. **TF33.0 (real-hardware verification) is the next actual step** — see
-   below. TF33.7 (fake detection producer) and TF33.8 (sub-stack launch
-   composition) wait behind it: whether they're still the right next tasks
-   depends on what verification finds.
+6. ~~TF33.0~~ — *done (2026-11-13)*: real-hardware verification passed
+   with F36 (run `f36run6`). Next: TF33.8 Parts B/C, TF33.9, TF33.10;
+   TF33.7 stays deferred unless hardware becomes unavailable.
 
 **Consumer of everything this task publishes is `dome_mission`, never
 dome_nav** — dome_nav must never gain a `dome_semantic_msgs` dependency.
@@ -39,10 +38,12 @@ dome_nav** — dome_nav must never gain a `dome_semantic_msgs` dependency.
 
 ## TF33.0 — Real-hardware verification: test the stack bottom-up
 
-**Status**: in progress — SLAM re-basing run **failed 2026-11-12**: the same
-can returns 0.36 m off after a loop and gets a new ID. Root cause is the
-re-basing design (TF33.3), fixed by F36 (approved). Rerun after F36. Run notes
-in `process/02-doc/current.md` ("TF33.0 run, 2026-11-12").
+**Status**: done 2026-11-13 — **pass** on the F36 re-run (`f36run6`): one can
+ID through three loops with the can out of view 33–70 s each, moved ≤ 0.01 m
+while SLAM corrected odometry by 1.1 m. The 2026-11-12 SLAM run had failed
+(same can 0.36 m off, new ID each loop) from the re-basing design, which F36
+removed. Run notes in `process/02-doc/current.md` ("TF36.7 re-run,
+2026-11-13" and "TF33.0 run, 2026-11-12").
 
 TF33.1–TF33.6 are done but only unit-tested — never run against real OAK-D
 hardware. No combined launch exists yet (that's TF33.8), so verification is

@@ -90,7 +90,9 @@ gap with a ~0.3 m offset keeps its ID. The full suite and ruff stay clean.
 
 ## TF36.7 — Real-robot check
 
-**Status**: not done
+**Status**: done 2026-11-13 — **pass** on run `f36run6`: one can ID through
+three out-of-view gaps (33, 62, 70 s), moved ≤ 0.01 m while `map → odom`
+grew to 1.1 m. Results in `current.md`, "TF36.7 re-run, 2026-11-13"
 
 **Description**: Run F36's demo on the robot. This doubles as TF33.0's
 re-run; record the result in both.

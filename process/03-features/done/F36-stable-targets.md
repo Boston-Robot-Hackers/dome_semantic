@@ -2,13 +2,13 @@
 
 **Priority**: High
 
-**Done:** no
+**Done:** yes
 
 **Tasks File Created:** yes
 
-**Tests Written:** no
+**Tests Written:** yes
 
-**Test Passing:** no
+**Test Passing:** yes
 
 **Description**: Make a confirmed target stay put in the `map` frame, so the
 same unmoved object keeps one ID and one pose across loops and while out of

@@ -4,8 +4,8 @@
 
 ## Where I got to
 
-- **Paused 2026-11-13 mid TF36.7 re-run** to charge the battery; resume
-  from "Next steps", step 1.
+- **TF36.7 and TF33.0 passed 2026-11-13** on run `f36run6`, and **F36 is
+  closed**. See "TF36.7 re-run, 2026-11-13". Next is "Next steps", step 1.
 - **TF36.0 done 2026-11-13**: drive bag recorded and replayed through the
   current node. **The can's new ID came from the remove timeout, not
   drift.** See "TF36.0 bag replay, 2026-11-13".
@@ -16,6 +16,41 @@
   can re-association, add a same-label merge pass, and keep out-of-view
   targets. TF33.0 stays open until a re-run passes with F36.
 - **URDF fixed 2026-11-12**; see `history.md`.
+
+## TF36.7 re-run, 2026-11-13: pass
+
+**Setup**: full stack, real SLAM, map and bag `f36run6` (387 s). One can,
+taped **1.5 m** straight ahead, so the tape point is map (1.5, 0.0). The
+semantic node started ~57 s after the bag.
+
+**Result: pass.** One can ID, T1, from first to last observation (1496
+obs), at (1.60, −0.04) → (1.59, −0.05): **moved ≤ 0.01 m**, 0.10 m from
+the tape.
+
+| Out of view | Robot pose when re-seen | Range |
+|---|---|---|
+| 155–188 s (33 s) | (2.54, −1.30), past the can, facing 127° | 1.56 m |
+| 203–265 s (62 s) | (−0.11, −0.07), near the start | 1.70 m |
+| 282–351 s (70 s) | (−0.25, 0.24), returning from the north | 1.86 m |
+
+- **SLAM corrected a lot, and the can held**: `map → odom` grew to
+  (−1.10, 0.16, 6.7°) by the end. With re-basing this would have moved
+  the can by up to ~1 m; without it, nothing moved.
+- **No second can ID.** The other 11 targets are all cups.
+
+**Still open, outside F36:**
+
+- **11 false cup IDs**, several with 5–15 obs, now permanent since lost
+  targets are kept. Cup T13 at (1.22, −0.13), 0.38 m from the can with
+  9 obs, may be the can/cup double label.
+- **Cup T2 at (3.28, −1.54)**, 1061 obs, was also seen in `f36run3`/`4`
+  in that direction. The user says there is no cup, so it's a steady
+  false detection of something real there.
+
+**Runs that don't count**: `f36run3` (563 s) never moved: the robot sat at
+(0, 0) the whole time. `f36run4` has no bag (the recorder wasn't started);
+its saved map also shows a single can ID. `f36run5` was abandoned before
+driving.
 
 ## TF36.7 robot run, 2026-11-13
 
@@ -203,16 +238,16 @@ T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°)
 
 ## Open
 
-- **RESUME HERE (paused 2026-11-13 to charge the battery)**: TF36.7
-  re-run. Check `~/bags/f36run3` first (recorded mid-session, may be
-  partial), then follow "TF36.7 re-run procedure" with map name
-  `f36run4`. See "Next steps", step 1.
-- **Repo state**: F36 TF36.0–TF36.6 committed 2026-11-13, literate docs
-  refreshed (chapter 09 is now `target_merge`). 153 tests pass and ruff is
+- **F36 closed 2026-11-13; TF33.0 done.** Next: "Next steps", step 1.
+- **Repo state**: F36 code committed 2026-11-13 (`453ad90`), literate docs
+  refreshed (chapter 09 is now `target_merge`). The TF36.7/TF33.0 write-up
+  and F36 close-out are not yet committed. 153 tests pass and ruff is
   clean. ruff isn't installed on the robot; use
   `~/ros2_ws/src/dome_vision/.ruff-venv/bin/ruff`.
-- **Bags on the robot**: `~/bags/f36drive` (drive, TF36.0) and the replays
-  `f36replay_before`, `_after`, `_merge`, `_keep`.
+- **Bags on the robot**: `~/bags/f36drive` (drive, TF36.0), the replays
+  `f36replay_before`, `_after`, `_merge`, `_keep`, and the robot runs
+  `f36run`, `f36run3`, `f36run5` (partial) and `f36run6` (the pass). Next
+  unused map name: `f36run7`.
 - **Robot hardware state**:
   - The external USB hub is gone; the OAK-D plugs straight into the Pi.
   - **The OAK-D connects at USB 3 only in the bus 2/3 blue port.** The
@@ -225,7 +260,7 @@ T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°)
   - The 5 V rail reads 5.1–5.2 V at idle, up from ~5.0 V in October.
 - **Two `semantic_map` nodes run together**: `dome2`'s vision launch still
   starts `dome_vision`'s old one beside ours. `dome_vision` F71 (drafted,
-  not approved) retires it; its gate is TF33.0's SLAM run.
+  not approved) retires it; its gate, TF33.0's SLAM run, passed 2026-11-13.
 - **RViz markers** were seen on 2026-11-12: they work but are nearly
   invisible at map zoom (proposed chore).
 - **`dome2` issues found on 2026-11-12**: odometry drifts a lot (SLAM
@@ -247,24 +282,18 @@ T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°)
 
 ## Next steps, in order
 
-1. **Resume here: TF36.7 re-run (= TF33.0 re-run).** TF36.0–TF36.6 are
-   done and committed (`453ad90`). The first robot run (`f36run`) passed
-   for the tracker but the taped can also became T27 from depth error at
-   ~2.6 m (see "TF36.7 robot run"). **Before re-running, check
-   `~/bags/f36run3`** (recording started 11:29 on 11-13, session ended
-   mid-run): if it holds three full loops, analyze it instead of
-   re-running. **Use the next unused name, `f36run4`**: `f36run2`/`f36run3`
-   already have SLAM pose graphs and bags, and reusing a name restores them.
-   See "TF36.7 re-run procedure" below.
-2. **Then**: write the result up, close TF36.7 (and TF33.0 if it passes),
-   close F36 with `/close-feature 36`. Raise in `dome_vision`: depth error
-   on small objects past ~2 m, and the can/cup double label.
-3. **Build the rest of F36, then rerun TF33.0's SLAM run** with it. Pass:
-   the same can keeps its ID, or lands within the new radius, across loops.
-   Drive 2–3 real passes past the can this time.
-3. **Then** TF33.8 Parts B/C, TF33.9 (Pi CPU), TF33.10 (docs). Raise the
-   can/cup double label and the 10 s EKF stall in their own packages.
-4. **Approve or revise `dome_vision` F70/F71** once TF33.0 passes.
+1. **Raise in their own packages**:
+   - **`dome_vision`**: depth error on small objects past ~2 m, the can/cup
+     double label, and steady false cups.
+   - **`dome_nav`**: the `/cmd_vel` type mismatch and the `bt_navigator`
+     `error_code_names` crash.
+   - **`dome2`**: odometry drift and the 10 s EKF stall.
+2. **Decide on false confirmations**, which are now permanent. Candidates:
+   drop lost targets with few observations, or widen the cup radii. Needs
+   its own feature.
+3. **Then** TF33.8 Parts B/C, TF33.9 (Pi CPU), TF33.10 (docs).
+4. **Approve or revise `dome_vision` F70/F71**: TF33.0 has passed, so
+   F71's gate is met.
 
 **Planned: move the power testing to `dome2`.** It covers the whole robot,
 not the semantic map. Move `tools/power_load_test.sh`,
