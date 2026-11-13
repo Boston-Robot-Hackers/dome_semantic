@@ -25,11 +25,9 @@ class WorldTrackerConfig(BaseModel):
     # Prevents a burst of detections in a single second from instant confirmation.
     min_time_s: float = 1.0
 
-    # Seconds without observation before a confirmed target is marked lost.
+    # Seconds without observation before a confirmed target is marked lost (it is
+    # kept), or a potential is dropped.
     lost_timeout_s: float = 5.0
-
-    # Seconds after going lost before a confirmed target is removed from memory entirely.
-    remove_timeout_s: float = 30.0
 
     # If True, a new potential is only promoted when at least one confirmed target is
     # co-observed in the same frame (the "anchor" requirement). Prevents spurious

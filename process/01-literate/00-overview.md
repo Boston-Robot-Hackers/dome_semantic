@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-08-03"
+version: "1.1"
+generated: "2026-11-13"
 ---
 
 # `dome_semantic` — Theory of Operation
@@ -29,16 +29,24 @@ package. Three kinds of noise make it hard:
 - **Odometry drift** — the same physical object, re-observed a minute later,
   won't measure at *exactly* the same position, because the robot's own
   position estimate has drifted slightly in between.
-- **SLAM corrections** — occasionally, the SLAM backend doesn't just drift
-  gradually, it *jumps*: a loop closure revises `map → odom` all at once,
-  and every previously-recorded position needs the same correction or the
-  map falls out of alignment with itself.
+- **Long gaps out of view** — the robot drives a loop and comes back a
+  minute later. The object hasn't moved, but nothing has seen it in the
+  meantime.
 
-Each of these has a dedicated answer in the chapters below: detector noise
-is handled by requiring multiple confirmations before trusting a sighting
-(`world_tracker.py`); odometry drift is handled by an association radius
-wide enough to tolerate it (`association.py`); SLAM jumps are handled by
-explicitly re-basing stored state when they're detected (`map_rebasing.py`).
+Each of these has a dedicated answer in the chapters below:
+
+- **Detector noise**: require several confirmations before trusting a
+  sighting (`world_tracker.py`).
+- **Drift**: an association radius wide enough to absorb it
+  (`association.py`, 0.4 m for cans), plus a merge pass that folds
+  duplicates that slipped through back into the older ID (`target_merge.py`).
+- **Gaps**: confirmed targets are marked lost but never deleted, so a
+  re-sighting resumes the old ID (`world_tracker.py`).
+
+**Stored positions are never moved after the fact.** An earlier design
+re-based every stored target when SLAM stepped `map → odom`; F36 removed
+that, because the step describes the robot's *later* drift, not an error
+in an *earlier* observation (`13-semantic_map_node.md`).
 
 ## Architecture: three layers
 
@@ -51,13 +59,13 @@ flowchart TB
     subgraph "Adapters"
         direction TB
         TF[tf_adapter.py]
-        REBASE[map_rebasing.py]
         PARAMS[tracker_params.py]
         PERSIST[semantic_persistence.py]
     end
     subgraph "Pure tracking core"
         direction TB
         WT[world_tracker.py]
+        MERGE[target_merge.py]
         ASSOC[association.py]
         TARGETS[targets.py]
         CFG[tracker_config.py]
@@ -68,7 +76,6 @@ flowchart TB
     end
 
     NODE --> TF
-    NODE --> REBASE
     NODE --> PARAMS
     NODE --> PERSIST
     NODE --> WT
@@ -76,6 +83,8 @@ flowchart TB
     PERSIST --> WT
     PERSIST --> CFG
     WT --> ASSOC
+    WT --> MERGE
+    MERGE --> TARGETS
     WT --> TARGETS
     WT --> CFG
     WT --> PROFILES
@@ -87,14 +96,14 @@ flowchart TB
     SIZE --> GEOM
 ```
 
-1. **Pure tracking core** (`world_tracker.py`, `association.py`,
+1. **Pure tracking core** (`world_tracker.py`, `association.py`, `target_merge.py`,
    `targets.py`, `tracker_config.py`, `class_profiles.py`,
    `embedding_similarity.py`, `size_estimate.py`, `geometry.py`) — no ROS
    imports anywhere in this layer. Everything here is plain Python and
    numpy, testable with `pytest` alone, no `rclpy.init()` required. This is
    almost the entire package by file count and by where the actual
    decisions get made.
-2. **Adapters** (`tf_adapter.py`, `map_rebasing.py`, `tracker_params.py`,
+2. **Adapters** (`tf_adapter.py`, `tracker_params.py`,
    `semantic_persistence.py`) — the translation layer between "ROS/OS
    concepts" (TF frames, ROS parameters, the filesystem) and "plain values"
    (a 3-tuple, a `WorldTrackerConfig`, a `WorldTracker`). Each is
@@ -105,7 +114,7 @@ flowchart TB
    detections, drives the pure core, publishes the results, persists them.
 
 This shape — pure core, thin adapters, one wiring node — is why the package
-is testable at 127 passing tests with only a handful of them needing any
+is testable at 153 passing tests with only a handful of them needing any
 ROS machinery at all (mocked `tf2_ros.Buffer`/`TransformListener`, no real
 ROS graph). It's also why a new tracking feature almost always means editing
 the pure core, not the node: the node's job is to move data across the ROS
@@ -122,7 +131,6 @@ sequenceDiagram
     participant Assoc as TargetAssociator
 
     Cam->>Node: Detection3DArray
-    Node->>Node: maybe_rebase() — apply any SLAM correction<br/>to already-stored targets first
     Node->>TF: transform(xyz_camera, stamp)
     TF-->>Node: xyz_map (or None, dropped)
     Node->>Tracker: update(observations, timestamp_s)
@@ -130,7 +138,8 @@ sequenceDiagram
     Tracker->>Assoc: find_match() per observation
     Assoc-->>Tracker: matched target, or None (spawn new potential)
     Tracker->>Tracker: promote() — enough frames + time -> confirmed
-    Tracker->>Tracker: expire() — mark lost / forget
+    Tracker->>Tracker: merge_duplicates() — fold same-class pairs in range
+    Tracker->>Tracker: expire() — mark lost (kept), drop stale potentials
     Tracker-->>Node: visible confirmed targets
     Node->>Node: publish_targets() + publish_markers() (throttled)
 ```
@@ -155,15 +164,15 @@ The chapters build bottom-up — each one only depends on chapters before it:
 | 06 | [`tracker_config.py`](06-tracker_config.md) | the tuning single source of truth |
 | 07 | [`association.py`](07-association.md) | baseline + PASA matching |
 | 08 | [`tf_adapter.py`](08-tf_adapter.md) | camera → map point transform |
-| 09 | [`map_rebasing.py`](09-map_rebasing.md) | SE(2) re-basing on SLAM jumps |
-| 10 | [`world_tracker.py`](10-world_tracker.md) | the confirm/lose/forget state machine |
+| 09 | [`target_merge.py`](09-target_merge.md) | folding duplicate confirmed targets together |
+| 10 | [`world_tracker.py`](10-world_tracker.md) | the confirm/lose/merge state machine |
 | 11 | [`tracker_params.py`](11-tracker_params.md) | config → ROS parameters |
 | 12 | [`semantic_persistence.py`](12-semantic_persistence.md) | save/restore keyed to SLAM map identity |
 | 13 | [`semantic_map_node.py`](13-semantic_map_node.md) | the ROS node that wires it all together |
 | 14 | [`semantic.launch.py`](14-semantic_launch.md) | launching the node (optional no-SLAM `map→odom`) |
 
-Reading 05 → 06 → 07 → 10 in sequence covers the tracking algorithm itself
-end to end; 08, 09, 11, 12, 13, 14 cover how that algorithm gets fed from, and
+Reading 05 → 06 → 07 → 09 → 10 in sequence covers the tracking algorithm
+itself end to end; 08, 11, 12, 13, 14 cover how that algorithm gets fed from, and
 exposed back to, a live ROS system.
 
 ## What's deliberately not in this package yet

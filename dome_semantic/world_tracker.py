@@ -16,14 +16,15 @@ from dome_semantic.class_profiles import (
 )
 from dome_semantic.embedding_similarity import cosine_sim
 from dome_semantic.size_estimate import SizeEstimate
+from dome_semantic.target_merge import merge_close_targets
 from dome_semantic.targets import ConfirmedTarget, Observation, PotentialTarget
 from dome_semantic.tracker_config import WorldTrackerConfig
 
 
 class WorldTracker:
     """Two-tier state machine: PotentialTarget accumulates evidence, ConfirmedTarget holds
-    reliable estimates. Confirmed targets survive visibility gaps and persist across sessions
-    via to_json/from_json. Association is label-constrained so cups never absorb cans.
+    reliable estimates. Confirmed targets are kept, marked lost, while out of view, and
+    persist across sessions via to_json/from_json. Association is label-constrained so cups never absorb cans.
     """
 
     def __init__(self, config: WorldTrackerConfig):
@@ -36,6 +37,11 @@ class WorldTracker:
         self.label_map: dict = {}
         self.assoc_log: list[dict] = []
         self.load_profiles()
+        self.merge_radius_by_class = {
+            name: profile.merge_radius_m
+            for name, profile in self.profiles.items()
+            if profile.merge_radius_m is not None
+        }
         self.assoc = TargetAssociator(config, self.profiles)
 
     def load_profiles(self) -> None:
@@ -57,6 +63,7 @@ class WorldTracker:
         remaining = self.recover_false_splits(observations, timestamp_s)
         self.associate(remaining, timestamp_s)
         self.promote(remaining, timestamp_s)
+        self.merge_duplicates()
         self.expire(timestamp_s)
         return [t for t in self.confirmed if not t.is_lost]
 
@@ -228,19 +235,20 @@ class WorldTracker:
             )
             self.has_confirmed = True
 
+    def merge_duplicates(self) -> None:
+        merges = merge_close_targets(self.confirmed, self.merge_radius_by_class)
+        for kept_id, dropped_id in merges:
+            self.assoc_log.append(
+                {"outcome": "merged", "target_id": kept_id, "merged_id": dropped_id}
+            )
+
     def expire(self, timestamp_s: float) -> None:
         for t in self.confirmed:
             if timestamp_s - t.last_seen_s > self.config.lost_timeout_s:
                 t.is_lost = True
             elif t.is_lost:
                 t.is_lost = False
-        self.confirmed = [
-            t
-            for t in self.confirmed
-            if not (
-                t.is_lost and timestamp_s - t.last_seen_s > self.config.remove_timeout_s
-            )
-        ]
+        # Confirmed targets are never deleted (F36): lost is a status, not removal.
         self.potentials = [
             p
             for p in self.potentials

@@ -1,6 +1,6 @@
 ---
-version: "1.1"
-generated: "2026-10-22"
+version: "1.2"
+generated: "2026-11-13"
 ---
 
 # `semantic_map_node.py` — Where Detections Become a Typed, Shareable Map
@@ -23,10 +23,8 @@ doing one job:
 
 1. **Geometry** — camera-frame point → map-frame point, at the moment the
    detection was taken (`tf_adapter.py`, used by this node).
-2. **Stability under SLAM corrections** — when the SLAM backend revises its
-   `map → odom` estimate (a "jump"), every already-recorded position needs
-   the same correction applied, or the map silently drifts out of alignment
-   with reality (`map_rebasing.py`, used by this node).
+2. **Stability** — a recorded target is *left alone*: it is never shifted
+   when SLAM steps `map → odom` (F36; see "Why there is no re-basing").
 3. **Confirmation** — a single sighting isn't a fact; `min_frames` sightings
    over `min_time_s` seconds is treated as one (`world_tracker.py`, wrapped
    by this node).
@@ -48,10 +46,6 @@ sequenceDiagram
     participant Tracker as WorldTracker
 
     Cam->>Node: Detection3DArray (stamp, N detections)
-    Node->>TF: lookup_transform(map, odom, stamp)
-    alt map->odom jumped since last check
-        Node->>Node: rebase_tracker() — shift every stored target
-    end
     loop each detection
         Node->>Adapter: transform(xyz_camera, stamp)
         Adapter->>TF: lookup_transform(map, camera_link, stamp)
@@ -62,54 +56,39 @@ sequenceDiagram
         end
     end
     Node->>Tracker: update(observations, timestamp_s)
-    Note over Tracker: associate / promote / expire
+    Note over Tracker: associate / promote / merge / mark lost
     alt frame_num % publish_every_n == 0
         Node->>Node: publish_targets() + publish_markers()
     end
 ```
 
-Two things about this diagram are worth calling out because they're easy to
-get backwards:
+**A missing transform drops the detection, not the whole message.** Each
+detection in the array is transformed independently; one dropped point
+because of a momentary TF gap doesn't discard the others.
 
-- **Re-basing happens before transforming**, not after. If a SLAM correction
-  landed between the previous callback and this one, every *already-stored*
-  target needs the correction applied first — otherwise the newly-transformed
-  detection would be compared against stale, un-corrected positions during
-  association, and `WorldTracker` would see a large spurious "jump" and
-  create a duplicate target instead of matching the existing one.
-- **A missing transform drops the detection, not the whole message.** Each
-  detection in the array is transformed independently; one dropped point
-  because of a momentary TF gap doesn't discard the others.
+## Why there is no re-basing
 
-## Re-basing: the part that only exists because SLAM lies a little
+Each detection is transformed `camera_link → map` **at its own stamp**, and
+that is the last time the node touches its position. An earlier version
+also *re-based* every stored target whenever `map → odom` stepped. F36
+removed it.
 
-`slam_toolbox` doesn't hold `map → odom` fixed. Every loop closure or scan
-match nudges it — small drifts most of the time, occasional multi-centimeter
-jumps when a loop closes. `odom` itself stays smooth (that's the whole point
-of having an odometry frame), so the *detection* geometry
-(`camera → odom`, effectively fixed by wheel/IMU odometry) doesn't move —
-only where `odom` sits *within* `map` moves.
+- **What a `map → odom` step means.** `slam_toolbox` steps `map → odom` to
+  absorb the odometry drift accumulated *since its last graph node*. It is
+  a correction to where the robot is *now*, not a revision of where an
+  earlier observation was.
+- **Why re-basing was wrong.** A target already transformed at its own
+  stamp is SLAM's best estimate of it. Shifting it by a later step adds the
+  robot's *later* drift to an *earlier* observation, which effectively
+  pins targets to `odom`, the frame that drifts.
+- **What the data showed.** On the 2026-11-13 drive bag, re-basing moved
+  targets up to 0.42 m while they were still being observed; without it no
+  target moves more than ~0.1 m.
 
-```python
-def maybe_rebase(self, stamp) -> None:
-    current = self.lookup_map_to_odom(stamp)
-    if current is None:
-        return
-    if self.last_map_t_odom is not None and has_jumped(self.last_map_t_odom, current):
-        delta = rebase_delta(self.last_map_t_odom, current)
-        rebase_tracker(self.tracker, delta)
-        self.get_logger().info("map->odom jumped; re-based stored targets.")
-    self.last_map_t_odom = current
-```
-
-`last_map_t_odom is None` guards the very first call: there is nothing to
-compare against yet, so the first observed `map → odom` becomes the
-baseline rather than being treated as an infinite jump from an undefined
-starting point. Every stored `ConfirmedTarget`'s position — not just new
-detections — gets the same rigid-body correction (`rebase_tracker`, defined
-in `map_rebasing.py`), so a can recorded five minutes ago and a can recorded
-one second ago stay consistent with each other after a correction, even
-though only one of them was actually re-observed.
+The cost is real: after a true loop closure, old targets stay where SLAM
+put them at the time. The remaining SLAM + depth spread (~0.13–0.2 m) is
+absorbed by a wider can re-association radius and the tracker's merge pass
+(`world_tracker.py`, `target_merge.py`), not by moving stored state.
 
 ## The publishing surface: four views of the same state
 
@@ -148,6 +127,10 @@ yaw as the heading the *robot* should arrive facing, not a claim about the
 object — so identity is the honest value until a real orientation source
 exists.
 
+**Lost targets are published too.** A confirmed target out of view is
+marked lost but never deleted (F36), and stays in the array. Consumers judge
+freshness by `last_seen`; the node doesn't filter for them.
+
 ### Markers: a sphere and a label per confirmed target
 
 ```python
@@ -166,6 +149,8 @@ rule `dome_vision`'s `draw_detections` uses for its image label
   sitting inside it. It uses the image's bounding-box green.
 - The 5 cm label sits just above the sphere: the offset is half the sphere
   plus half the text height.
+- **Lost targets are dimmed**: `LOST_TARGET_COLOR`, a translucent grey, in
+  place of green, so a viewer can tell remembered objects from seen ones.
 - **Stable marker IDs**: `target_id * 2` for the sphere, `+ 1` for the label.
   RViz treats a marker ID as identity, so reusing a target's IDs on the next
   publish updates the markers in place instead of piling up duplicates.
@@ -180,7 +165,9 @@ if self.tracker.config.use_class_profiles and self.tracker.assoc_log:
     self.publish_assoc_diag()
 ```
 
-This one bypasses the throttle deliberately — it's a debugging feed for
+Each entry is one observation's outcome (`new`, `matched`, `recovered`),
+or a `merged` record from the tracker's merge pass naming the kept and the
+dropped ID. This one bypasses the throttle deliberately — it's a debugging feed for
 tuning the F38 PASA association cost function, and a tuning session wants
 every frame's association decision, not a sampled subset. It's gated on
 `use_class_profiles` because `assoc_log` is only populated when that feature
@@ -304,13 +291,17 @@ system turned on.
 ## Observations
 
 - **The node has almost no logic of its own.** Every substantial decision
-  (association, confirmation, geometry, re-basing math) lives in a module
+  (association, confirmation, merging, geometry) lives in a module
   this file imports; `SemanticMapNode` is close to pure wiring plus
   ROS-message translation. That's by design — it keeps the pieces testable
-  in isolation (as `test_map_rebasing.py`, `test_tf_adapter.py`, and
+  in isolation (as `test_target_merge.py`, `test_tf_adapter.py`, and
   `test_world_tracker.py` each do) and this file's own tests
   (`test_semantic_map_node.py`) focused on integration, not re-deriving unit
   coverage.
+- **Lost targets accumulate for the whole session.** Nothing deletes a
+  confirmed target any more, so a false confirmation is permanent until the
+  saved map is discarded. Pruning lost targets with few observations would
+  be the obvious follow-up.
 - **The observation-count grammar in `/describe_scene` doesn't distinguish
   singular from plural** (`"1 can"`, not `"1 can"` vs `"2 cans"`) — a minor,
   easy follow-up if the voice-integration consumer wants more natural

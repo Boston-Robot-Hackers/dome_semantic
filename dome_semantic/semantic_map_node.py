@@ -3,12 +3,13 @@
 # Author: Pito Salas and Claude Code
 # Open Source Under MIT license
 
-"""Subscribes /oak/detections_3d, transforms each detection camera_link -> map
-at observation time (F33 G1), and re-bases every stored WorldTracker target
-whenever the map->odom transform jumps beyond a small epsilon (a SLAM
-correction). Publishes the confirmed map as a typed `SemanticTargetArray`
-(F33 G2) plus RViz markers, an association-diagnostics feed, and a
-`/describe_scene` service. Confirmation-threshold tuning is ROS-declared via
+"""Subscribes /oak/detections_3d and transforms each detection camera_link -> map
+at observation time (F33 G1). Stored targets are never re-based when
+map->odom steps (F36): that step absorbs the robot's later odometry drift,
+not an error in an earlier observation. Publishes the confirmed map as a
+typed `SemanticTargetArray` (F33 G2) plus RViz markers, an
+association-diagnostics feed, and a `/describe_scene` service.
+Confirmation-threshold tuning is ROS-declared via
 `declare_tracker_config` (WorldTrackerConfig stays the single source of
 truth, F34 precedent) so it is launch-overridable without a hand-duplicated
 param list.
@@ -40,20 +41,12 @@ from std_srvs.srv import Trigger
 from vision_msgs.msg import Detection3DArray
 from visualization_msgs.msg import Marker, MarkerArray
 
-from dome_semantic.map_rebasing import (
-    PlanarTransform,
-    has_jumped,
-    rebase_delta,
-    rebase_tracker,
-    yaw_from_quaternion,
-)
 from dome_semantic.semantic_persistence import load_semantic_map, save_semantic_map
 from dome_semantic.tf_adapter import TFAdapter
 from dome_semantic.tracker_params import declare_tracker_config
 
 CAMERA_FRAME = "camera_link"
 MAP_FRAME = "map"
-ODOM_FRAME = "odom"
 SCHEMA_VERSION = 1
 MARKER_LIFETIME = Duration(sec=2, nanosec=0)
 TARGET_SPHERE_DIAMETER_M = 0.08  # about a can's size, so it covers the object
@@ -61,6 +54,7 @@ TARGET_LABEL_HEIGHT_M = 0.05
 POTENTIAL_SPHERE_DIAMETER_M = 0.04
 # Same green as dome_vision's bounding boxes, so the two views read alike.
 TARGET_COLOR = ColorRGBA(r=0.0, g=1.0, b=0.0, a=0.8)
+LOST_TARGET_COLOR = ColorRGBA(r=0.5, g=0.5, b=0.5, a=0.4)  # dimmed: out of view
 
 
 def sphere_scale(diameter_m: float) -> Vector3:
@@ -122,7 +116,6 @@ class SemanticMapNode(Node):
         self.tf_thread = threading.Thread(target=self.spin_tf, daemon=True)
         self.tf_thread.start()
         self.adapter = TFAdapter(self.tf_buffer, CAMERA_FRAME, MAP_FRAME)
-        self.last_map_t_odom: PlanarTransform | None = None
         self.frame_num = 0
         self.sub = self.create_subscription(
             Detection3DArray, "/oak/detections_3d", self.on_detections, 10
@@ -136,35 +129,9 @@ class SemanticMapNode(Node):
             Trigger, "/describe_scene", self.on_describe_scene
         )
 
-    def lookup_map_to_odom(self, stamp) -> PlanarTransform | None:
-        try:
-            tf = self.tf_buffer.lookup_transform(MAP_FRAME, ODOM_FRAME, stamp)
-        except (
-            tf2_ros.LookupException,
-            tf2_ros.ConnectivityException,
-            tf2_ros.ExtrapolationException,
-        ):
-            return None
-        t = tf.transform.translation
-        q = tf.transform.rotation
-        return PlanarTransform(t.x, t.y, yaw_from_quaternion(q.z, q.w))
-
-    def maybe_rebase(self, stamp) -> None:
-        current = self.lookup_map_to_odom(stamp)
-        if current is None:
-            return
-        if self.last_map_t_odom is not None and has_jumped(
-            self.last_map_t_odom, current
-        ):
-            delta = rebase_delta(self.last_map_t_odom, current)
-            rebase_tracker(self.tracker, delta)
-            self.get_logger().info("map->odom jumped; re-based stored targets.")
-        self.last_map_t_odom = current
-
     def on_detections(self, msg: Detection3DArray) -> None:
         stamp = msg.header.stamp
         timestamp_s = stamp.sec + stamp.nanosec * 1e-9
-        self.maybe_rebase(stamp)
 
         observations = []
         tf_dropped = 0
@@ -201,8 +168,6 @@ class SemanticMapNode(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = MAP_FRAME
         for t in self.tracker.confirmed:
-            if t.is_lost:
-                continue
             target = SemanticTarget()
             target.schema_version = SCHEMA_VERSION
             target.target_id = str(t.target_id)
@@ -223,15 +188,13 @@ class SemanticMapNode(Node):
         label_z_offset_m = (TARGET_SPHERE_DIAMETER_M + TARGET_LABEL_HEIGHT_M) / 2
 
         for t in self.tracker.confirmed:
-            if t.is_lost:
-                continue
             x, y, z = t.xyz_world
             sphere = make_marker(
                 stamp, MAP_FRAME, "semantic_map", t.target_id * 2, Marker.SPHERE
             )
             sphere.pose.position = Point(x=x, y=y, z=z)
             sphere.scale = sphere_scale(TARGET_SPHERE_DIAMETER_M)
-            sphere.color = TARGET_COLOR
+            sphere.color = LOST_TARGET_COLOR if t.is_lost else TARGET_COLOR
             array.markers.append(sphere)
 
             text = make_marker(

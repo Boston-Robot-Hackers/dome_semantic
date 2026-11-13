@@ -1,10 +1,12 @@
 # Current status
 
-**2026-11-12, evening**. See `process/02-doc/history.md` for the
-completed-work log.
+**2026-11-13**. See `process/02-doc/history.md` for the completed-work log.
 
 ## Where I got to
 
+- **TF36.0 done 2026-11-13**: drive bag recorded and replayed through the
+  current node. **The can's new ID came from the remove timeout, not
+  drift.** See "TF36.0 bag replay, 2026-11-13".
 - **TF33.0's SLAM re-basing run failed on 2026-11-12, and the cause is the
   re-basing design.** The same unmoved can comes back 0.36 m off after a
   loop, so it gets a new ID each time. See "TF33.0 run, 2026-11-12".
@@ -12,6 +14,101 @@ completed-work log.
   can re-association, add a same-label merge pass, and keep out-of-view
   targets. TF33.0 stays open until a re-run passes with F36.
 - **URDF fixed 2026-11-12**; see `history.md`.
+
+## TF36.0 bag replay, 2026-11-13
+
+**Bags**: `~/bags/f36drive` (395 s; `/tf`, `/tf_static`,
+`/oak/detections_3d`, `/odom`, `/scan`) and `~/bags/f36replay_before`
+(`/semantic/targets` from the current node, re-basing on). Map name
+`f36bag`; replay `map_name` `f36replay_before`.
+
+**Setup**: robot started at map (0, 0) facing **−x** (yaw −179.8°), so
+the can, taped 1.0 m straight ahead, is at map **(−1.0, 0.0)**. The robot
+sat still ~110 s, drove 110–240 s, then sat still to the end.
+
+**Result for the can:**
+
+| ID | Seen (s) | Obs | Pose (map) | Tape error |
+|---|---|---|---|---|
+| T1 | 1–110 | 1052 | (−1.07, 0.12) | 0.14 m |
+| T21 | 154–160 | 18 | (−1.05, 0.24) | 0.25 m |
+
+- **Position held**: T21 is 0.13 m from T1, inside the can's 0.15 m
+  `drift_tolerance_m`, though `map → odom` had grown to 0.2–0.5 m and up
+  to 14° by then.
+- **New ID because T1 was deleted**: lost at ~110 s (`lost_timeout_s` 5),
+  removed 30 s later (`remove_timeout_s`); the can was out of view ~50 s.
+  This is **TF36.5**'s case.
+- **Re-basing barely mattered here**: `map → odom` was exactly zero while
+  T1 was observed.
+- **Thin evidence**: the drive passed the can only once, not 2–3 times.
+  TF36.2 compares on this one revisit.
+
+**Other findings**:
+
+- **Can/cup double label is back**: a second object near map
+  (0.6–1.1, −0.3 to −1.0) produced cans T15/T16/T34/T38 and cups
+  T17/T35/T39, with can+cup pairs at the same spot (T16/T17, T34/T39).
+  Cup clusters near (−0.7, −3.6) and a can at (−1.76, 0.43) are unidentified.
+- **`/cmd_vel` type mismatch**: Nav2's `collision_monitor` publishes
+  `TwistStamped`, `gendrv` subscribes `Twist`, so Nav2 commands never reach
+  the motors (teleop is unaffected). `ros2 bag record` logs an error about
+  it; harmless for the recording. A `dome2`/`dome_nav` issue.
+- The EKF's `odom` starts at yaw −179.8°, not 0.
+
+## TF36.2 replay without re-basing, 2026-11-13
+
+Same `~/bags/f36drive`, through the TF36.1 node, into
+`~/bags/f36replay_after` (`map_name` `f36replay_after`).
+
+**The taped can is unchanged**: T1 (−1.07, 0.12), 0.14 m tape error, then
+T24 at (−1.05, 0.24) after the gap, exactly as before. Re-basing wasn't
+the cause in this drive; **the 30 s remove timeout is** (TF36.5).
+
+**Elsewhere, re-basing was sliding targets while they were observed:**
+
+| | Before (re-basing) | After (none) |
+|---|---|---|
+| Target IDs | 20 | 25 |
+| Per-ID `moved_m` | up to 0.42 m | ≤ 0.06 m (one 0.11) |
+
+- **Without re-basing, targets stay put, and more IDs split.** In the
+  cluster near (0.6–1.0, −0.4 to −1.0), later sightings land beside the
+  earlier IDs instead of dragging them, e.g. cans T19 (0.86, −0.43),
+  T37 (0.80, −0.37), T40 (0.97, −0.49): **~0.1–0.2 m apart**, just past
+  the can's 0.15 m radius.
+- **Measured spread for one re-observed object is ~0.13–0.2 m** here, not
+  the 0.3 m of TF33.0's run. TF36.3's ~0.4 m starting radius covers it.
+- **Can't yet check "doesn't merge two real cans"**: what's actually in
+  that cluster is unknown, and it's also full of can/cup double labels.
+
+## Replay with TF36.3 + TF36.4 (0.4 m radius, merge pass), 2026-11-13
+
+`~/bags/f36replay_merge`: **23 IDs** (25 without them). In the cluster,
+can IDs drop from 6 to 4 and settle into **two cans ~0.45 m apart**, near
+(0.65, −0.95) and (0.9, −0.45), so 0.4 m keeps them separate.
+
+- **Every remaining can duplicate is a deleted-then-re-seen case**:
+  T38 is 0.12 m from T17 and T33 is 0.11 m from T18, but T17/T18 were
+  removed 30 s after going lost, before the newcomer confirmed. Same for
+  the taped can (T1 → T21). **TF36.5 should collapse all of these.**
+- Merges inside a visibility window work: e.g. old T21 folded into T17.
+
+## Replay with all of TF36.1–TF36.5, 2026-11-13
+
+`~/bags/f36replay_keep`: **18 IDs** (20 at baseline, 23 with only the
+radius + merge). **Pass for the taped can**: T1 keeps its ID across the
+~50 s gap, 1074 obs (the re-sighting's 18 folded in), 0.14 m tape error.
+
+- **Cluster**: two cans, T17 (0.68, −0.86) and T18 (0.94, −0.48),
+  0.44 m apart; the T38/T33 duplicates folded into them (122 and 254 obs).
+- **Can T21** at (−1.72, 0.41), 11 obs, 0.75 m from T1: unidentified.
+- **New cost: false confirmations are now permanent.** 13 cup IDs stay on
+  the map, several with only 7–17 obs, plus cup T19/T34 on top of cans
+  T18/T17 (double label). Cups T22/T25 are 0.17 m apart, past the cup's
+  0.12 m merge radius. Candidate follow-ups, outside F36: drop lost
+  targets with few obs, widen the cup radii, fix the double label in
+  `dome_vision`.
 
 ## TF33.0 run, 2026-11-12
 
@@ -75,10 +172,12 @@ T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°)
 
 ## Open
 
-- **Repo state**: checkpoint 2026-11-12 (evening). Docs only since the
-  last commit: the TF33.0 run write-up, F36/TF36 (approved), two proposed
-  chores, bag replay notes. 160 tests pass and ruff is clean. ruff isn't
-  installed on the robot; use `~/ros2_ws/src/dome_vision/.ruff-venv/bin/ruff`.
+- **Repo state**: F36 TF36.0–TF36.6 committed 2026-11-13, literate docs
+  refreshed (chapter 09 is now `target_merge`). 153 tests pass and ruff is
+  clean. ruff isn't installed on the robot; use
+  `~/ros2_ws/src/dome_vision/.ruff-venv/bin/ruff`.
+- **Bags on the robot**: `~/bags/f36drive` (drive, TF36.0) and the replays
+  `f36replay_before`, `_after`, `_merge`, `_keep`.
 - **Robot hardware state**:
   - The external USB hub is gone; the OAK-D plugs straight into the Pi.
   - **The OAK-D connects at USB 3 only in the bus 2/3 blue port.** The
@@ -97,21 +196,29 @@ T10, T31, then T33 at (1.46, 0.57) with `map → odom` (0.07, −0.01, −6.2°)
 - **`dome2` issues found on 2026-11-12**: odometry drifts a lot (SLAM
   corrected 1 m and 25° in one session), and the EKF once stalled for
   10.65 s. Raise both in `dome2`.
+- **`/cmd_vel` type mismatch** found 2026-11-13: `collision_monitor`
+  publishes `TwistStamped`, `gendrv` subscribes `Twist`. Raise in
+  `dome2`/`dome_nav`.
 - **Semantic node stopped publishing once** on 2026-11-12, not reproduced.
   If it recurs, keep it running and take a stack dump (`py-spy` isn't
   installed yet).
 
 ## Next steps, in order
 
-1. **F36 approved 2026-11-12. Next: TF36.0, record the drive bag** on the
-   robot (commands in `notes.md`, "Bag replay of a drive"). Restart the whole
-   stack first so the robot starts at map (0, 0); tape the distance from the
-   wheel axle midpoint to the can's centre, straight ahead. Hold 10 s, then
-   2–3 loops with the can out of view for over 30 s. A throwaway
-   `/semantic/targets` bag summarizer was written in session scratch; re-create
-   it for the replay (one row per ID: pose, obs count, time seen, tape error).
-2. **Build F36, then rerun TF33.0's SLAM run** with it. Pass: the same can
-   keeps its ID, or lands within the new radius, across loops.
+1. **TF36.0–TF36.6 done and committed 2026-11-13**; can
+   `drift_tolerance_m` and `merge_radius_m` are both 0.40 m, merge pass in
+   `target_merge.py`, confirmed targets never deleted (`remove_timeout_s`
+   gone). **Next: TF36.7**, the robot run (= TF33.0 re-run): 2–3 real
+   passes past the can, out of view for over 30 s each. `world_tracker.py` is 393 lines, over the ~300 soft cap
+   (`dome_vision` F56's split, never ported). **Two real cans closer than
+   0.4 m will now merge**; the shipped-config test keeps 0.5 m apart. Replays use
+   `~/bags/f36drive`; the summarizer and TF sampler lived in session
+   scratch, so re-create them (one row per ID: pose, obs count, time seen,
+   tape error vs map (−1.0, 0.0)). **Read the start yaw from the bag before
+   computing the tape point.**
+2. **Build the rest of F36, then rerun TF33.0's SLAM run** with it. Pass:
+   the same can keeps its ID, or lands within the new radius, across loops.
+   Drive 2–3 real passes past the can this time.
 3. **Then** TF33.8 Parts B/C, TF33.9 (Pi CPU), TF33.10 (docs). Raise the
    can/cup double label and the 10 s EKF stall in their own packages.
 4. **Approve or revise `dome_vision` F70/F71** once TF33.0 passes.

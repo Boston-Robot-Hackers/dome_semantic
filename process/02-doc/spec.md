@@ -14,9 +14,15 @@ depending on the object-detection stack directly.
   `ConfirmedTarget` holds a reliable estimate once enough frames/time have
   accumulated. Association is label-constrained (a cup observation never
   merges into a can's track).
-- **Persist across visibility gaps**: a confirmed target survives brief
-  occlusion/pan-away (`lost_timeout_s`) before being dropped
-  (`remove_timeout_s`); `to_json`/`from_json` round-trip confirmed targets
+- **Record in `map` at observation time**: each detection is transformed
+  `camera_link → map` at its own stamp. Stored targets are **not re-based**
+  when SLAM steps `map → odom` (F36).
+- **Persist across visibility gaps**: a confirmed target unseen for
+  `lost_timeout_s` is marked lost but **never deleted** (F36). Lost targets
+  keep publishing (consumers judge them by `last_seen`), are drawn dimmed
+  in RViz, and are saved. Same-label confirmed targets closer than the
+  class's `merge_radius_m` merge into the older ID. Potentials still expire
+  after `lost_timeout_s`. `to_json`/`from_json` round-trip confirmed targets
   across process restarts.
 - **Publish** (later task): `SemanticTargetArray` on `/semantic/targets`, the
   contract `dome_mission` already consumes.

@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-08-03"
+version: "1.1"
+generated: "2026-11-13"
 ---
 
 # `association.py` — Deciding "Is This the Same Object I Already Know About?"
@@ -151,9 +151,6 @@ a successful recovery consumes the observation and it never reaches
   `0.5` *before* calling `is_stationary`, so that harsher "not stationary"
   verdict never actually reaches the cost function. Easy to misread if you
   only look at one of the two functions.
-- **`euclidean` is duplicated conceptually with `map_rebasing`'s planar
-  math** — this one is full 3D (`(a[0]-b[0])**2 + ... + (a[2]-b[2])**2`),
-  used for association distance; `map_rebasing.py`'s transforms are
-  deliberately planar-only (x, y, yaw). Different problems, coincidentally
-  similar-looking formulas — not a DRY violation, since 3D distance and a
-  planar SE(2) transform aren't the same operation.
+- **`euclidean` hand-rolls `math.dist`** — full 3D,
+  `(a[0]-b[0])**2 + ... + (a[2]-b[2])**2`. `target_merge.py` uses
+  `math.dist` for the same distance; the two could share one.

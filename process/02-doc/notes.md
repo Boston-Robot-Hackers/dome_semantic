@@ -36,7 +36,9 @@ four features become moot *in dome_vision* (their target file will be gone).
 If the underlying improvements are still wanted, they'd need to be
 re-authored against `dome_semantic`'s own structure — not silently assumed
 to carry over, since by then this package's modules may already differ
-(TF33.3's map-frame re-basing, TF33.4's typed publishing).
+(TF33.4's typed publishing; F36's no-re-basing, kept lost targets and
+merge pass). **F39's merge idea is already done here** by F36's
+`target_merge.py`, without F39's size gate.
 
 **How to apply**: `dome_vision` F71 (retire the semantic layer) does the
 deletion; its TF71.0 checks whether F39/F40/F56/F57 landed there in the

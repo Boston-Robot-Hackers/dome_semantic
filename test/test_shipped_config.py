@@ -92,3 +92,49 @@ def test_shipped_config_keeps_two_close_cans_separate():
 # Guards the test above: at defaults the 0.6 m confirmed radius absorbs the second can.
 def test_defaults_merge_two_close_cans():
     assert second_can_after_first_confirms(WorldTrackerConfig()) == 1
+
+
+def can_count_after_reobservation(offset_m: float) -> int:
+    """Confirm a can at the origin, re-observe it offset_m away along x.
+    Returns the total target count: 1 if it re-associated, 2 if not."""
+    tracker = WorldTracker(shipped_config(min_frames=1, min_time_s=0.0))
+    for frame in range(3):
+        tracker.update([((0.0, 0.0, 0.5), "can", frame, None)], frame * 0.5)
+    tracker.update([((offset_m, 0.0, 0.5), "can", 3, None)], 2.0)
+    return len(tracker.confirmed_targets) + len(tracker.potential_targets)
+
+
+# F36: the can's radius covers the SLAM + depth spread a re-observation shows.
+def test_can_reobservation_inside_drift_tolerance_reassociates():
+    radius_m = load_class_profiles(str(PROFILES_FILE))["can"].drift_tolerance_m
+    assert can_count_after_reobservation(radius_m - 0.01) == 1
+
+
+def test_can_reobservation_outside_drift_tolerance_starts_new_target():
+    radius_m = load_class_profiles(str(PROFILES_FILE))["can"].drift_tolerance_m
+    assert can_count_after_reobservation(radius_m + 0.01) == 2
+
+
+# F36: merging must not undo the re-association radius, so they stay equal.
+def test_can_merge_radius_matches_drift_tolerance():
+    can = load_class_profiles(str(PROFILES_FILE))["can"]
+    assert can.merge_radius_m == can.drift_tolerance_m
+
+
+# F36 end to end, as in the 2026-11-13 drive: a can seen, out of view far past
+# the old 30 s delete, then seen again ~0.3 m off keeps its one ID.
+def test_can_keeps_id_after_long_gap_and_offset():
+    tracker = WorldTracker(shipped_config())
+    first_xyz, return_xyz = (-1.07, 0.12, 0.0), (-1.07, 0.42, 0.0)
+    for frame in range(100):
+        tracker.update([(first_xyz, "can", frame, 1, None)], frame * 0.1)
+    original_id = tracker.confirmed_targets[0].target_id
+    for second in range(10, 130):
+        tracker.update([], float(second))
+    assert tracker.confirmed_targets[0].is_lost is True
+    for frame in range(50):
+        tracker.update([(return_xyz, "can", 100 + frame, 9, None)], 130 + frame * 0.1)
+
+    assert [t.target_id for t in tracker.confirmed_targets] == [original_id]
+    assert tracker.confirmed_targets[0].is_lost is False
+    assert tracker.potential_targets == []

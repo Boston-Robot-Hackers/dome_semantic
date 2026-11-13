@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-08-03"
+version: "1.1"
+generated: "2026-11-13"
 ---
 
 # `targets.py` — The Shape of "One Object, Over Time"
@@ -17,8 +17,8 @@ stateDiagram-v2
     [*] --> PotentialTarget: first sighting
     PotentialTarget --> ConfirmedTarget: enough frames + enough time
     PotentialTarget --> [*]: not seen again in time
-    ConfirmedTarget --> ConfirmedTarget: is_lost=True (still remembered)
-    ConfirmedTarget --> [*]: lost too long — forgotten
+    ConfirmedTarget --> ConfirmedTarget: is_lost=True (kept, never deleted)
+    ConfirmedTarget --> [*]: merged into an older same-class target
 ```
 
 - **`Observation`** — a `NamedTuple`, not a stored/mutated entity: one
@@ -33,8 +33,9 @@ stateDiagram-v2
   threshold (`world_tracker.WorldTracker.promote()`). It carries everything
   `PotentialTarget` does, plus the fields that only make sense once an
   object is trusted: convergence tracking, an optional appearance
-  embedding, and the `is_lost` flag that lets a target survive a temporary
-  visibility gap instead of being deleted outright.
+  embedding, and the `is_lost` flag that marks a target out of view.
+  Since F36 a confirmed target is never deleted for being unseen; it only
+  leaves the map by merging into an older one (`target_merge.py`).
 
 ## Why two classes instead of one with a `confirmed: bool` flag
 

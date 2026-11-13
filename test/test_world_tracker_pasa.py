@@ -14,7 +14,6 @@ def pasa_cfg(**kwargs):
         "min_frames": 3,
         "min_time_s": 0.5,
         "lost_timeout_s": 2.0,
-        "remove_timeout_s": 30.0,
         "assoc_cost_distance_weight": 1.0,
         "assoc_cost_size_weight": 0.5,
         "assoc_cost_track_hint_weight": 0.3,
@@ -80,7 +79,6 @@ def test_reentry_after_occlusion_reuses_id():
             enable_false_split_recovery=True,
             false_split_lookback_s=5.0,
             lost_timeout_s=1.0,
-            remove_timeout_s=30.0,
         )
     )
     cup_size = estimate_size_m((35, 65), 1.0, 493.86, 493.87)
@@ -137,7 +135,6 @@ def test_degrades_gracefully_with_poor_depth():
             min_frames=3,
             min_time_s=0.5,
             lost_timeout_s=2.0,
-            remove_timeout_s=30.0,
         )
     )
 
@@ -172,7 +169,6 @@ def test_profiles_disabled_identical_to_baseline():
             min_frames=3,
             min_time_s=0.5,
             lost_timeout_s=2.0,
-            remove_timeout_s=30.0,
         )
     )
     tracker_old = WorldTracker(
@@ -180,7 +176,6 @@ def test_profiles_disabled_identical_to_baseline():
             min_frames=3,
             min_time_s=0.5,
             lost_timeout_s=2.0,
-            remove_timeout_s=30.0,
         )
     )
 

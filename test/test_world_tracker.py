@@ -3,6 +3,8 @@
 # Author: Pito Salas and Claude Code
 # Open Source Under MIT license
 
+import json
+
 import numpy as np
 import pytest
 
@@ -29,7 +31,6 @@ def fast_cfg(**kwargs):
         "min_frames": 2,
         "min_time_s": 0.1,
         "lost_timeout_s": 2.0,
-        "remove_timeout_s": 5.0,
     }
     defaults.update(kwargs)
     return WorldTrackerConfig(**defaults)
@@ -56,7 +57,6 @@ def test_config_defaults():
     assert c.min_frames == 5
     assert c.min_time_s == 1.0
     assert c.lost_timeout_s == 5.0
-    assert c.remove_timeout_s == 30.0
     assert c.require_anchor is False
 
 
@@ -148,19 +148,21 @@ def test_no_promotion_too_fast():
 
 
 def test_confirmed_goes_lost():
-    tracker = WorldTracker(fast_cfg(lost_timeout_s=1.0, remove_timeout_s=100.0))
+    tracker = WorldTracker(fast_cfg(lost_timeout_s=1.0))
     feed(tracker, (1.0, 0.0, 0.0), "cup", n_frames=3, dt=0.2)
-    # advance past lost_timeout but well before remove_timeout
     result = tracker.update([], 3.0)
     assert len(result) == 0
     assert tracker.confirmed_targets[0].is_lost is True
 
 
-def test_lost_target_removed():
-    tracker = WorldTracker(fast_cfg(lost_timeout_s=1.0, remove_timeout_s=2.0))
+# F36: a confirmed target unseen far past the old 30 s remove timeout is kept, and saved.
+def test_lost_confirmed_target_kept_and_saved():
+    tracker = WorldTracker(fast_cfg(lost_timeout_s=1.0))
     feed(tracker, (1.0, 0.0, 0.0), "cup", n_frames=3, dt=0.2)
-    tracker.update([], 20.0)
-    assert len(tracker.confirmed_targets) == 0
+    tracker.update([], 600.0)
+    assert len(tracker.confirmed_targets) == 1
+    assert tracker.confirmed_targets[0].is_lost is True
+    assert [e["label"] for e in json.loads(tracker.to_json())] == ["cup"]
 
 
 def test_stale_potential_removed():
@@ -253,14 +255,6 @@ def test_empty_observations_no_crash():
     assert result == []
 
 
-def test_all_objects_removed_empty_list():
-    tracker = WorldTracker(fast_cfg(lost_timeout_s=1.0, remove_timeout_s=2.0))
-    feed(tracker, (1.0, 0.0, 0.0), "cup", n_frames=3, dt=0.2)
-    tracker.update([], 20.0)
-    assert tracker.confirmed_targets == []
-    assert tracker.update([], 20.1) == []
-
-
 def test_query_on_empty_tracker():
     tracker = WorldTracker(fast_cfg())
     assert tracker.query("cup") is None
@@ -268,7 +262,7 @@ def test_query_on_empty_tracker():
 
 
 def test_reobserved_after_lost_clears_flag():
-    tracker = WorldTracker(fast_cfg(lost_timeout_s=1.0, remove_timeout_s=100.0))
+    tracker = WorldTracker(fast_cfg(lost_timeout_s=1.0))
     feed(tracker, (1.0, 0.0, 0.0), "cup", n_frames=3, dt=0.2)
     tracker.update([], 3.0)  # goes lost
     assert tracker.confirmed_targets[0].is_lost is True
@@ -677,7 +671,6 @@ def fsr_cfg(**kwargs):
         "min_frames": 2,
         "min_time_s": 0.1,
         "lost_timeout_s": 1.0,
-        "remove_timeout_s": 100.0,
         "enable_false_split_recovery": True,
         "false_split_lookback_s": 5.0,
     }
@@ -698,18 +691,17 @@ def test_false_split_recovery_reuses_id():
     assert t.target_id == original_id
 
 
-# After the original target is fully removed (past remove_timeout), reobservation creates a new target.
-def test_false_split_expired_creates_new():
-    # use remove_timeout_s=2.0 so original target is fully removed before reobservation
-    tracker = WorldTracker(fsr_cfg(false_split_lookback_s=1.0, remove_timeout_s=2.0))
+# Past the false-split lookback the lost target is still kept (F36), so normal
+# association re-attaches the re-observation to it instead of starting a new one.
+def test_reobservation_past_lookback_reattaches_to_kept_target():
+    tracker = WorldTracker(fsr_cfg(false_split_lookback_s=1.0))
     feed(tracker, (1.0, 0.0, 0.0), "cup", n_frames=3, dt=0.2)
     original_id = tracker.confirmed_targets[0].target_id
-    tracker.update([], 20.0)  # past remove_timeout — target gone from confirmed list
-    assert len(tracker.confirmed_targets) == 0
+    tracker.update([], 20.0)
     tracker.update([obs((1.0, 0.0, 0.0), "cup")], 20.5)
-    # no confirmed target to absorb → new potential
-    assert len(tracker.potential_targets) == 1
-    assert tracker.potential_targets[0].target_id != original_id
+    assert tracker.potential_targets == []
+    assert [t.target_id for t in tracker.confirmed_targets] == [original_id]
+    assert tracker.confirmed_targets[0].is_lost is False
 
 
 # Size incompatibility must block false-split recovery; baseline association handles the reactivation instead.
@@ -720,7 +712,6 @@ def test_false_split_incompatible_size_no_recovery():
             min_frames=1,
             min_time_s=0.0,
             lost_timeout_s=1.0,
-            remove_timeout_s=100.0,
             enable_false_split_recovery=True,
             false_split_lookback_s=5.0,
             size_confidence_floor=0.5,
@@ -771,7 +762,6 @@ def drift_cfg(**kwargs):
         "min_frames": 1,
         "min_time_s": 0.0,
         "lost_timeout_s": 5.0,
-        "remove_timeout_s": 30.0,
     }
     defaults.update(kwargs)
     return WorldTrackerConfig(**defaults)
@@ -817,7 +807,6 @@ def test_drift_tolerance_absent_falls_back_to_mult():
             max_assoc_dist_m=0.3,
             confirmed_assoc_mult=4.0,
             lost_timeout_s=5.0,
-            remove_timeout_s=30.0,
         )
     )
     for i in range(3):

@@ -6,7 +6,7 @@ data.
 
 ## TF36.0 — Record a bag and replay it through the current node
 
-**Status**: not done
+**Status**: done 2026-11-13 — results in `current.md`, "TF36.0 bag replay"
 
 **Description**: On the robot, record one bag (`/tf`, `/tf_static`,
 `/oak/detections_3d`, `/odom`, `/scan`). Drive the same loop 2–3 times past
@@ -20,7 +20,7 @@ and the error against the tape. The bag recording and replay commands go in
 
 ## TF36.1 — Remove global re-basing
 
-**Status**: not done
+**Status**: done 2026-11-13
 
 **Description**: Delete `map_rebasing.py`, `maybe_rebase` and
 `last_map_t_odom` from `semantic_map_node.py`, plus their tests. Amend F33's
@@ -33,7 +33,7 @@ changes and nothing new is observed.
 
 ## TF36.2 — Replay the same bag without re-basing
 
-**Status**: not done
+**Status**: done 2026-11-13 — comparison in `current.md`
 
 **Description**: Replay TF36.0's bag through the TF36.1 node and compare
 duplicate IDs, spread and tape error with TF36.0's numbers. If the spread is
@@ -44,7 +44,7 @@ fix.
 
 ## TF36.3 — Widen can re-association
 
-**Status**: not done
+**Status**: done 2026-11-13 — can `drift_tolerance_m` 0.40 m
 
 **Description**: Set the can's `drift_tolerance_m` in
 `config/class_profiles.yaml` from TF36.2's measured spread, with margin.
@@ -55,7 +55,7 @@ one at plus 1 cm creates a potential.
 
 ## TF36.4 — Merge pass for same-label confirmed targets
 
-**Status**: not done
+**Status**: done 2026-11-13 — `target_merge.py`; can `merge_radius_m` 0.40 m
 
 **Description**: After each update, merge same-label confirmed targets
 closer than the class's `merge_radius_m` (raised to suit TF36.2's numbers),
@@ -67,7 +67,7 @@ different labels at the same point don't.
 
 ## TF36.5 — Keep confirmed targets when unseen
 
-**Status**: not done
+**Status**: done 2026-11-13 — `remove_timeout_s` removed
 
 **Description**: Stop deleting confirmed targets on `remove_timeout_s`.
 Lost stays a status: lost targets keep publishing on `/semantic/targets`
@@ -80,7 +80,7 @@ timeout is still published and saved; a potential still expires.
 
 ## TF36.6 — Test suite for F36
 
-**Status**: not done
+**Status**: done 2026-11-13 — long-gap whole-tracker test in `test_shipped_config.py`
 
 **Description**: Make sure TF36.1, TF36.3, TF36.4 and TF36.5's tests exist
 and pass, plus a whole-tracker test: one object re-observed after a long

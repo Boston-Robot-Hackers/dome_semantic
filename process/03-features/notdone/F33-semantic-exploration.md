@@ -18,9 +18,10 @@ feature implements the integration it describes.
 
 - **G1 frame of record: `map`.** Detections are transformed into the `map`
   frame at observation time via live TF (`map→odom→base_link→camera_link`).
-  The semantic-map owner re-bases recorded targets when SLAM corrections jump
-  `map→odom`, so the semantic map stays aligned with the saved SLAM map and
-  works for Mode B reuse (G8).
+  Targets stay where they were recorded and are **not re-based** when SLAM
+  steps `map→odom` (amended 2026-11-13 by F36: re-basing added the robot's
+  later drift to earlier observations). They are stored in the saved SLAM
+  map's frame, so they work for Mode B reuse (G8).
 - **G2 contract: real ROS msg in a shared package.** A new msgs-only package
   (working name `dome_semantic_msgs`) defines a typed, versioned
   `SemanticTarget` msg replacing the schemaless `/targets/confirmed` JSON.
@@ -65,8 +66,8 @@ independently shippable and later phases depend on decisions validated by
 earlier ones.
 
 - **Phase A — contract + adapter + launch (this feature's first milestone).**
-  Msgs package, neutral semantic-map package with `map`-frame recording and
-  re-basing, nav-side consumption via the new msg, combined launch file
+  Msgs package, neutral semantic-map package with `map`-frame recording
+  (re-basing dropped by F36), nav-side consumption via the new msg, combined launch file
   (OAK-D + slam_toolbox + Nav2 + explorer + semantic map, with TF-ordering
   constraints). Exploration stays vision-unaware. Fixes the G2 contract bug.
 - **Phase C — two-phase explore-then-survey.** Explore and save the metric map
@@ -87,7 +88,7 @@ earlier ones.
   schema version).
 - New `dome_semantic` package: semantic-map node adapted from dome_vision's
   SemanticMapNode/WorldTracker — subscribes `/oak/detections_3d`, records in
-  `map` frame, re-bases on `map→odom` jumps, persists JSON keyed to SLAM map
+  `map` frame (no re-basing, F36), persists JSON keyed to SLAM map
   identity (`--map_name`, G8), publishes `SemanticTarget` array + markers +
   `/describe_scene` service.
 - dome_nav: `nav_manager` consumes the typed msg (replaces the JSON

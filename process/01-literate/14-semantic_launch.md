@@ -1,6 +1,6 @@
 ---
-version: "1.1"
-generated: "2026-11-05"
+version: "1.2"
+generated: "2026-11-13"
 ---
 
 # `semantic.launch.py` — One Command for the Semantic Node
@@ -86,9 +86,9 @@ if static_map_odom:
 
 Two things to know:
 
-- **It skips re-basing** (chapter 09). With an identity `map→odom` the map
-  never jumps, so this setup exercises detections → tracker → publishing,
-  not the SLAM-correction path.
+- **It never moves `map→odom`**, so this setup exercises detections →
+  tracker → publishing without any SLAM steps. Since F36 the node doesn't
+  react to those steps anyway; they only change where new detections land.
 - **It must never run alongside SLAM.** `slam_toolbox` also publishes
   `map→odom`; two publishers of the same transform fight. That is why the
   flag defaults to off.

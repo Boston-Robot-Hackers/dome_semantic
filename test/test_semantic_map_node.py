@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# test_semantic_map_node — F33 T03: TF integration + re-basing wiring
+# test_semantic_map_node — node wiring: TF, publishing, persistence
 # Author: Pito Salas and Claude Code
 # Open Source Under MIT license
 
@@ -26,7 +26,6 @@ from vision_msgs.msg import (
 )
 from visualization_msgs.msg import Marker
 
-from dome_semantic.map_rebasing import PlanarTransform
 from dome_semantic.targets import ConfirmedTarget
 
 TEST_DOMAIN_ID = 87  # keeps test traffic off a live robot's graph
@@ -123,75 +122,27 @@ def test_on_detections_drops_when_tf_unavailable(node):
     assert node.tracker.potential_targets == []
 
 
-def test_lookup_map_to_odom_returns_none_on_lookup_exception():
-    import tf2_ros
-
-    from dome_semantic.semantic_map_node import SemanticMapNode
-
-    with patch("tf2_ros.TransformListener"):
-        node = SemanticMapNode()
-    node.tf_buffer = MagicMock()
-    node.tf_buffer.lookup_transform.side_effect = tf2_ros.LookupException("no tf")
-
-    assert node.lookup_map_to_odom(RosTime(sec=1, nanosec=0)) is None
-    node.destroy_node()
-
-
-def test_lookup_map_to_odom_converts_transform():
-    from dome_semantic.semantic_map_node import SemanticMapNode
-
-    with patch("tf2_ros.TransformListener"):
-        node = SemanticMapNode()
-    node.tf_buffer = MagicMock()
-    node.tf_buffer.lookup_transform.return_value = make_transform_stamped(
-        1.0, 2.0, math.pi / 2
-    )
-
-    result = node.lookup_map_to_odom(RosTime(sec=1, nanosec=0))
-
-    assert result == PlanarTransform(1.0, 2.0, pytest.approx(math.pi / 2))
-    node.destroy_node()
-
-
-def test_maybe_rebase_applies_delta_on_jump(node):
+def test_stored_target_unchanged_when_map_to_odom_jumps(node):
+    """F36: targets stay where they were recorded; a SLAM step is not re-applied."""
     target = ConfirmedTarget(
         target_id=1,
         label="can",
         canonical_class="can",
-        xyz_world=(0.0, 0.0, 1.0),
+        xyz_world=(1.0, 2.0, 0.5),
         observation_count=5,
         confirmed_at_s=1.0,
         last_seen_s=1.0,
     )
     node.tracker.confirmed.append(target)
-    node.last_map_t_odom = PlanarTransform(0.0, 0.0, 0.0)
-    node.tf_buffer.lookup_transform.return_value = make_transform_stamped(3.0, 0.0, 0.0)
-
-    node.maybe_rebase(RosTime(sec=2, nanosec=0))
-
-    assert target.xyz_world == pytest.approx((3.0, 0.0, 1.0))
-    assert node.last_map_t_odom == PlanarTransform(3.0, 0.0, pytest.approx(0.0))
-
-
-def test_maybe_rebase_noop_within_epsilon(node):
-    target = ConfirmedTarget(
-        target_id=1,
-        label="can",
-        canonical_class="can",
-        xyz_world=(0.0, 0.0, 1.0),
-        observation_count=5,
-        confirmed_at_s=1.0,
-        last_seen_s=1.0,
-    )
-    node.tracker.confirmed.append(target)
-    node.last_map_t_odom = PlanarTransform(0.0, 0.0, 0.0)
+    node.tf_buffer.lookup_transform.return_value = make_transform_stamped()
+    node.on_detections(make_detections([], sec=2))
     node.tf_buffer.lookup_transform.return_value = make_transform_stamped(
-        0.001, 0.0, 0.0
+        3.0, -1.0, 0.5
     )
 
-    node.maybe_rebase(RosTime(sec=2, nanosec=0))
+    node.on_detections(make_detections([], sec=3))
 
-    assert target.xyz_world == pytest.approx((0.0, 0.0, 1.0))
+    assert target.xyz_world == pytest.approx((1.0, 2.0, 0.5))
 
 
 def test_publish_targets_after_confirmation(node):
@@ -218,7 +169,7 @@ def test_publish_targets_after_confirmation(node):
     assert target.track_ids == ["7"]
 
 
-def test_publish_targets_skips_still_potential_and_lost(node):
+def test_publish_targets_skips_potentials(node):
     node.publish_every_n = 1
     node.tf_buffer.lookup_transform.return_value = make_transform_stamped()
     node.tf_buffer.transform.return_value = make_point_result(1.0, 2.0, 0.0)
@@ -325,26 +276,6 @@ def test_node_save_writes_current_tracker_state(node, tmp_path):
     assert envelope["targets"][0]["label"] == "cup"
 
 
-def test_maybe_rebase_seeds_baseline_without_rebasing_on_first_call(node):
-    target = ConfirmedTarget(
-        target_id=1,
-        label="can",
-        canonical_class="can",
-        xyz_world=(5.0, 5.0, 1.0),
-        observation_count=5,
-        confirmed_at_s=1.0,
-        last_seen_s=1.0,
-    )
-    node.tracker.confirmed.append(target)
-    assert node.last_map_t_odom is None
-    node.tf_buffer.lookup_transform.return_value = make_transform_stamped(9.0, 9.0, 1.0)
-
-    node.maybe_rebase(RosTime(sec=2, nanosec=0))
-
-    assert target.xyz_world == pytest.approx((5.0, 5.0, 1.0))
-    assert node.last_map_t_odom == PlanarTransform(9.0, 9.0, pytest.approx(1.0))
-
-
 def wait_until(condition, timeout_s: float) -> bool:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
@@ -445,3 +376,40 @@ def test_publish_markers_labels_target_like_annotated_image(node):
     assert text.text == "CN1"
     assert text.scale.z == pytest.approx(0.05)
     assert text.pose.position.z > sphere.pose.position.z
+
+
+def lost_can() -> ConfirmedTarget:
+    return ConfirmedTarget(
+        target_id=4,
+        label="can",
+        canonical_class="can",
+        xyz_world=(1.0, 2.0, 0.0),
+        observation_count=20,
+        confirmed_at_s=1.0,
+        last_seen_s=1.0,
+        is_lost=True,
+    )
+
+
+# F36: out-of-view targets stay on the map; consumers judge them by last_seen.
+def test_publish_targets_includes_lost_target(node):
+    node.tracker.confirmed.append(lost_can())
+    node.pub_targets = MagicMock()
+
+    node.publish_targets()
+
+    published = node.pub_targets.publish.call_args.args[0]
+    assert [t.target_id for t in published.targets] == ["4"]
+
+
+def test_publish_markers_draws_lost_target_dimmed(node):
+    from dome_semantic.semantic_map_node import LOST_TARGET_COLOR
+
+    node.tracker.confirmed.append(lost_can())
+    node.pub_markers = MagicMock()
+
+    node.publish_markers()
+
+    markers = node.pub_markers.publish.call_args.args[0].markers
+    sphere = next(m for m in markers if m.type == Marker.SPHERE)
+    assert sphere.color == LOST_TARGET_COLOR

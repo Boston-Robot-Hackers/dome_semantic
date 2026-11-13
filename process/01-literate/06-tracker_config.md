@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-08-03"
+version: "1.1"
+generated: "2026-11-13"
 ---
 
 # `tracker_config.py` — Every Tuning Knob, Documented Where It's Declared
@@ -31,9 +31,11 @@ strategies in `association.py`:
 
 **Baseline association** (always active): `max_assoc_dist_m`,
 `confirmed_assoc_mult`, `min_frames`, `min_time_s`, `lost_timeout_s`,
-`remove_timeout_s`, `require_anchor` — the core confirm/lose/forget
-lifecycle every target goes through regardless of any other feature being
-enabled.
+`require_anchor` — the core confirm/lose lifecycle every target goes
+through regardless of any other feature being enabled. There is **no
+forget step**: `remove_timeout_s` was removed by F36, so a confirmed target
+is marked lost after `lost_timeout_s` and kept. The same timeout drops
+stale potentials.
 
 **F38 PASA association** (opt-in via `use_class_profiles`): everything
 prefixed `assoc_cost_*`, plus `class_profile_path` /
@@ -92,9 +94,7 @@ deliberate defense against either failure mode individually.
   `world_tracker.py`. Reading this file in isolation tells you what's
   tunable; it doesn't tell you what any value does without cross-referencing
   those two files.
-- **No cross-field validation** — e.g. nothing enforces
-  `remove_timeout_s > lost_timeout_s` (a target should presumably be marked
-  lost before it's removed), even though `world_tracker.expire()` implicitly
-  assumes that ordering. A pydantic `@model_validator` could catch a
-  misconfigured pair at construction time rather than producing surprising
-  runtime behavior (a target removed the same tick it goes lost).
+- **Unknown keys are silently ignored.** pydantic's default drops extra
+  fields, so a config still passing the removed `remove_timeout_s` (or any
+  typo) builds without complaint. `model_config = {"extra": "forbid"}`
+  would turn that into a construction error.

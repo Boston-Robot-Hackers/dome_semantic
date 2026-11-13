@@ -1,5 +1,6 @@
 # Class profiles for PASA association on the robot.
-# Values copied unchanged from dome_vision's roboflow_oak.yaml (world_tracker.class_profiles_inline).
+# Values copied from dome_vision's roboflow_oak.yaml (world_tracker.class_profiles_inline),
+# except the can's drift_tolerance_m and merge_radius_m, widened by F36.
 # canonical_class is the label published on /semantic/targets, and dome_mission matches it
 # exactly ("nav go can"), so keep it short.
 # examples/configs/class_profiles.yaml is a separate test fixture; do not point the robot at it.
@@ -15,8 +16,8 @@ class_profiles:
     max_stationary_speed_mps: 0.02
     size_confidence_floor: 0.5
     depth_noise_scale: 1.0
-    merge_radius_m: 0.10                # max distance between two confirmed targets to consider merging
-    drift_tolerance_m: 0.15             # re-observation radius for a confirmed target (sensor noise, not drift)
+    merge_radius_m: 0.40                # same-class confirmed targets closer than this merge; = drift_tolerance_m
+    drift_tolerance_m: 0.40             # re-observation radius; TF36.2 measured 0.13-0.2 m spread (SLAM + depth)
 
   - canonical_class: cup
     display_name: "coffee cup"

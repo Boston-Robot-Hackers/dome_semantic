@@ -1,6 +1,6 @@
 ---
-version: "1.1"
-generated: "2026-11-05"
+version: "1.2"
+generated: "2026-11-13"
 ---
 
 # `world_tracker.py` — The State Machine That Turns Noisy Sightings Into Facts
@@ -8,16 +8,18 @@ generated: "2026-11-05"
 ## The central idea
 
 `WorldTracker` is the heart of the package: everything else in
-`dome_semantic` either feeds it (`tf_adapter`, `map_rebasing`) or is fed by
+`dome_semantic` either feeds it (`tf_adapter`) or is fed by
 its config (`tracker_config`, `class_profiles`) or is a helper it delegates
-to (`association`, `embedding_similarity`, `size_estimate`). Its job is
+to (`association`, `target_merge`, `embedding_similarity`, `size_estimate`). Its job is
 deceptively simple to state and genuinely non-trivial to get right: **turn a
 stream of noisy, momentary detections into a small set of stable, confirmed
 facts about where objects are** — surviving detector noise, brief occlusion,
-sensor track-ID resets, and (via `map_rebasing`, applied externally by
-`SemanticMapNode`) SLAM corrections.
+sensor track-ID resets, long stretches out of view, and the ~0.1–0.2 m
+scatter that SLAM pose plus depth error put on re-sightings. **Stored
+positions are never shifted after the fact** (F36): a target stays where it
+was recorded.
 
-## One update, four phases, always in this order
+## One update, five phases, always in this order
 
 ```python
 def update(self, observations: list, timestamp_s: float) -> list[ConfirmedTarget]:
@@ -25,21 +27,24 @@ def update(self, observations: list, timestamp_s: float) -> list[ConfirmedTarget
     remaining = self.recover_false_splits(observations, timestamp_s)
     self.associate(remaining, timestamp_s)
     self.promote(remaining, timestamp_s)
+    self.merge_duplicates()
     self.expire(timestamp_s)
     return [t for t in self.confirmed if not t.is_lost]
 ```
 
 This is the entire public contract most callers need: hand it a batch of
 observations for one frame and the current time, get back the currently
-visible confirmed targets. The four phases run in a specific, load-bearing
-order:
+visible confirmed targets. (Lost ones are still in `confirmed_targets`; the
+return value just leaves them out.) The five phases run in a specific,
+load-bearing order:
 
 ```mermaid
 flowchart TD
     A["update(observations, timestamp_s)"] --> B[recover_false_splits]
     B -->|unconsumed observations| C[associate]
     C --> D[promote]
-    D --> E[expire]
+    D --> M[merge_duplicates]
+    M --> E[expire]
     E --> F["return visible confirmed targets"]
     B -.->|consumed: re-attached<br/>to a lost target| G[skipped in associate]
 ```
@@ -54,9 +59,14 @@ flowchart TD
 - **`promote` third** — check which potentials have earned confirmation
   *this frame's* observations, then move them from `self.potentials` to
   `self.confirmed`.
-- **`expire` last** — after all this frame's updates are applied, sweep for
-  targets that have gone quiet too long (mark lost) or too-long-lost (remove
-  entirely).
+- **`merge_duplicates` fourth** — fold together same-class confirmed
+  targets closer than the class's `merge_radius_m`, keeping the older ID
+  (see "Merging duplicates" below). It runs right after `promote`, so a
+  freshly confirmed duplicate is collapsed the same tick it appears.
+- **`expire` last** — after all this frame's updates are applied, mark
+  confirmed targets unseen for `lost_timeout_s` as lost, and drop stale
+  potentials. **Confirmed targets are never deleted** (F36): lost is a
+  status, not a removal.
 
 Running `expire` last, not first, matters: a target observed *this frame*
 should never be expired for having been unseen, even if its `last_seen_s`
@@ -168,6 +178,53 @@ that wants to distinguish "recently confirmed, still settling" from
 `welford_update_size` applies the same technique to `width_m` (the running
 size estimate), independently, with its own `size_m2`/`size_n` accumulators.
 
+## Merging duplicates
+
+```python
+def merge_duplicates(self) -> None:
+    merges = merge_close_targets(self.confirmed, self.merge_radius_by_class)
+    for kept_id, dropped_id in merges:
+        self.assoc_log.append(
+            {"outcome": "merged", "target_id": kept_id, "merged_id": dropped_id}
+        )
+```
+
+Two potentials of one object can confirm separately when sightings scatter,
+leaving two IDs a few centimetres apart. Association alone can't prevent
+that: each potential was matched against what existed *at the time*.
+
+- **The pass itself is pure** and lives in `target_merge.py` (chapter 09);
+  this method only supplies the radius table and logs each merge.
+- **`merge_radius_by_class` is built once** in `__init__`, from the class
+  profiles that set `merge_radius_m`. A class without one never merges, and
+  with `use_class_profiles` off the table is empty.
+- **Lost targets take part.** Because they are no longer deleted, a new ID
+  that forms beside a lost one folds back into it. On the 2026-11-13 drive
+  bag that is what turned three re-sighted cans back into their original
+  IDs.
+
+## Why lost targets are kept
+
+The tracker used to delete a confirmed target 30 s after it went lost
+(`remove_timeout_s`). That made the map forget anything out of view, so a
+can seen again after a loop got a new ID, and a deleted target was never
+saved. F36 removed the deletion and the parameter.
+
+```python
+for t in self.confirmed:
+    if timestamp_s - t.last_seen_s > self.config.lost_timeout_s:
+        t.is_lost = True
+    elif t.is_lost:
+        t.is_lost = False
+# Confirmed targets are never deleted (F36): lost is a status, not removal.
+```
+
+- **Association already considers lost targets**, so keeping them is all it
+  takes for a re-sighting within the class's `drift_tolerance_m` to resume
+  the old ID.
+- **The trade-off**: a false confirmation is now permanent for the session.
+  There is no removal on negative evidence (in view but not detected) yet.
+
 ## Recovering from a "false split"
 
 ```python
@@ -180,7 +237,7 @@ and then reappears, the naive outcome is a *new* `PotentialTarget` that has
 to independently re-earn confirmation — the tracker "forgets" it knew this
 object before, and (worse) ends up with two records for one physical thing.
 This method, working with `association.find_false_split`, checks incoming
-observations against lost-but-not-yet-forgotten confirmed targets first and,
+observations against recently lost confirmed targets first and,
 on a match, resurrects the *original* target (`t.is_lost = False`, then
 folds the new observation into its existing running statistics) rather than
 letting a duplicate spawn. `enable_false_split_recovery` gates this whole
@@ -276,6 +333,9 @@ position mismatch alone would.
   `update()`. Functionally correct (the map is idempotent — re-resolving an
   already-canonical label is a no-op), but a candidate for consolidation if
   this file's method count grows further.
+- **The file is past its size budget** (~390 lines against a ~300 soft
+  cap). `dome_vision` F56's split into store / stats / serializer was never
+  ported; the merge pass went to its own module to avoid making it worse.
 - **No method computes "how many targets are converged"** or similar
   aggregate queries beyond `query()` (single label, nth match) — a consumer
   wanting fleet-wide statistics (e.g. "how many targets are still
