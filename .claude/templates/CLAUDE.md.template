@@ -22,7 +22,7 @@ We are developing an app called <APP NAME>. All process files live under
 
 ## Commands
 
-The `Makefile` holds only user-facing tool targets (`make help` lists them).
+The `Makefile` holds the app's user-facing targets (`make help` lists them).
 Development commands run through `uv` from the repo root: `uv sync` (setup),
 `uv run pytest` (tests), and `uv run ruff format` / `uv run ruff check` — on
 changed files only, never the whole repo.
@@ -56,6 +56,12 @@ verify, say "unverified" explicitly.
 This checkout may not include required credentials or data files. Before any
 live external-system or data-extract work, check for these and stop with a
 short list of what's missing instead of improvising.
+
+## Hazards before any edit
+
+List here, one line each, only what must be known before *any* edit (e.g.
+"commits on main deploy automatically"). Everything else durable goes in
+`process/02-doc/notes.md`.
 
 ## Write Safety
 

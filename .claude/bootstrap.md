@@ -34,6 +34,11 @@ process/
     deferred/
     template.md
 ```
+### process/*/template.md
+Copy `.claude/templates/feature_template.md` to `process/03-features/template.md`,
+`task_template.md` to `process/04-tasks/template.md`, and `issue_template.md` to
+`process/05-issues/template.md`, each as-is.
+
 ### LICENSE
 Copy from `.claude/templates/LICENSE.template` and replace `<YEAR>` and `<AUTHOR NAME>`.
 
@@ -58,8 +63,9 @@ Copy from `.claude/templates/CLAUDE.md.template` and replace `<APP NAME>`.
 Copy from `.claude/templates/Makefile.template` and replace `<APP NAME>` in
 the header comment. It starts with only `help` (the default target); user-facing
 tool targets are added as features land. Development commands (`uv sync`,
-`uv run pytest`, `uv run ruff`) do not go in the Makefile — they are listed in
-CLAUDE.md's `## Commands`. See the Makefile rules in `.claude/style_guide.md`.
+`uv run pytest`, `uv run ruff`) are listed in CLAUDE.md's `## Commands`; add
+Makefile targets for them only when something needs them. See the Makefile
+rules in `.claude/style_guide.md`.
 
 ### .githooks/pre-commit
 Copy from `.claude/templates/pre-commit.template` as-is, then
@@ -84,10 +90,9 @@ Prompt the user to:
    Without it the hook is inert and headers silently stop updating, with no
    error to notice.
 2. Fill in `process/02-doc/spec.md` with the app description
-3. Initialize `process/02-doc/current.md` as the session handoff file — keep it
-   to just an `## Open` section (what's in progress/next); when work is marked
-   done, move that entry out of `current.md` into `process/02-doc/history.md`
-   rather than letting it accumulate in the always-read file
+3. Initialize `process/02-doc/current.md` as the session handoff file — just
+   an `## Open` section starting with `### Pick up here (YYYY-MM-DD)`, shaped
+   and size-limited as `.claude/process.md`'s *current.md* rules say
 4. Create `process/02-doc/history.md` with a one-line header (e.g. "# History")
    — it starts empty and only grows as work is marked done
 5. Add any durable architecture notes to `process/02-doc/notes.md`

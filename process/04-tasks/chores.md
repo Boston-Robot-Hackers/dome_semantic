@@ -50,3 +50,9 @@ Simple bug fixes and refactors (no spec/behavior change). One line each:
   package publishes shares one prefix and can't collide with
   `dome_vision`'s old `semantic_map` node (same node name, same marker
   topic). Update the docs and RViz config that name them.
+- [x] Sync `.claude/` to the canonical `~/j3` kit (exact copy, minus
+  `settings.local.json`), and restructure `current.md` to the kit's
+  `### Pick up here` shape: run write-ups moved to `history.md`, durable
+  facts (hardware, run procedure, commands, gotchas) to `notes.md`.
+- [ ] Make the kit's `uv`-based ruff hook and `/checkpoint` work here (no
+  `uv` on the robot, colcon package), or install `uv`.
