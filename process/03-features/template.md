@@ -6,6 +6,8 @@ Feature file name must be `FNN-<slug>.md` where `NN` matches the feature number.
 
 **Priority**: High | Medium | Low
 
+**Date Created:** YYYY-MM-DD
+
 **Done:** yes | no
 
 **Tasks File Created:** yes | no

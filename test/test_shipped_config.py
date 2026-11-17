@@ -53,6 +53,12 @@ def test_params_turn_pasa_on():
     assert shipped_config().use_class_profiles is True
 
 
+# At or below min_frames every confirmed target would pass, disabling F37.
+def test_min_keep_obs_above_confirmation_bar():
+    config = shipped_config()
+    assert config.min_keep_obs > config.min_frames
+
+
 # A key the node never declares is silently dropped by ROS, so a typo would hide.
 def test_every_param_is_a_declared_tracker_field():
     declared = set(WorldTrackerConfig.model_fields) - EXCLUDED_TRACKER_FIELDS

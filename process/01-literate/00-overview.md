@@ -40,8 +40,9 @@ Each of these has a dedicated answer in the chapters below:
 - **Drift**: an association radius wide enough to absorb it
   (`association.py`, 0.4 m for cans), plus a merge pass that folds
   duplicates that slipped through back into the older ID (`target_merge.py`).
-- **Gaps**: confirmed targets are marked lost but never deleted, so a
-  re-sighting resumes the old ID (`world_tracker.py`).
+- **Gaps**: confirmed targets are marked lost and kept, so a re-sighting
+  resumes the old ID (`world_tracker.py`). Only lost targets with too little
+  evidence (`min_keep_obs`) are deleted, as likely false confirmations.
 
 **Stored positions are never moved after the fact.** An earlier design
 re-based every stored target when SLAM stepped `map → odom`; F36 removed
@@ -139,7 +140,7 @@ sequenceDiagram
     Assoc-->>Tracker: matched target, or None (spawn new potential)
     Tracker->>Tracker: promote() — enough frames + time -> confirmed
     Tracker->>Tracker: merge_duplicates() — fold same-class pairs in range
-    Tracker->>Tracker: expire() — mark lost (kept), drop stale potentials
+    Tracker->>Tracker: expire() — mark lost, delete weak lost, drop stale potentials
     Tracker-->>Node: visible confirmed targets
     Node->>Node: publish_targets() + publish_markers() (throttled)
 ```

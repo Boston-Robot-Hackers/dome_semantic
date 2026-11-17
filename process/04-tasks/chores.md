@@ -56,3 +56,6 @@ Simple bug fixes and refactors (no spec/behavior change). One line each:
   facts (hardware, run procedure, commands, gotchas) to `notes.md`.
 - [ ] Make the kit's `uv`-based ruff hook and `/checkpoint` work here (no
   `uv` on the robot, colcon package), or install `uv`.
+- [ ] Add `Date Created` to the F33–F36 and TF33–TF36 files, dated from
+  each file's first commit, since the kit's rule makes new header fields
+  apply retroactively to `done/` files too.

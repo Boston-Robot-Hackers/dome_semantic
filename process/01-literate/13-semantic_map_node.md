@@ -128,7 +128,8 @@ object — so identity is the honest value until a real orientation source
 exists.
 
 **Lost targets are published too.** A confirmed target out of view is
-marked lost but never deleted (F36), and stays in the array. Consumers judge
+marked lost and, if it had at least `min_keep_obs` observations, stays in
+the array (F36, F37). Consumers judge
 freshness by `last_seen`; the node doesn't filter for them.
 
 ### Markers: a sphere and a label per confirmed target

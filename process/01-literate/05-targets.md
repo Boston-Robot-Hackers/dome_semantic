@@ -17,7 +17,8 @@ stateDiagram-v2
     [*] --> PotentialTarget: first sighting
     PotentialTarget --> ConfirmedTarget: enough frames + enough time
     PotentialTarget --> [*]: not seen again in time
-    ConfirmedTarget --> ConfirmedTarget: is_lost=True (kept, never deleted)
+    ConfirmedTarget --> ConfirmedTarget: is_lost=True, obs >= min_keep_obs (kept)
+    ConfirmedTarget --> [*]: goes lost with obs < min_keep_obs
     ConfirmedTarget --> [*]: merged into an older same-class target
 ```
 
@@ -34,8 +35,9 @@ stateDiagram-v2
   `PotentialTarget` does, plus the fields that only make sense once an
   object is trusted: convergence tracking, an optional appearance
   embedding, and the `is_lost` flag that marks a target out of view.
-  Since F36 a confirmed target is never deleted for being unseen; it only
-  leaves the map by merging into an older one (`target_merge.py`).
+  A confirmed target leaves the map only by merging into an older one
+  (`target_merge.py`), or by going lost with fewer than `min_keep_obs`
+  observations (F37).
 
 ## Why two classes instead of one with a `confirmed: bool` flag
 

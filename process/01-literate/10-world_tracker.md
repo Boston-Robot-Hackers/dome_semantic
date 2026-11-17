@@ -64,9 +64,9 @@ flowchart TD
   (see "Merging duplicates" below). It runs right after `promote`, so a
   freshly confirmed duplicate is collapsed the same tick it appears.
 - **`expire` last** — after all this frame's updates are applied, mark
-  confirmed targets unseen for `lost_timeout_s` as lost, and drop stale
-  potentials. **Confirmed targets are never deleted** (F36): lost is a
-  status, not a removal.
+  confirmed targets unseen for `lost_timeout_s` as lost, delete the lost
+  ones with fewer than `min_keep_obs` observations (F37), and drop stale
+  potentials.
 
 Running `expire` last, not first, matters: a target observed *this frame*
 should never be expired for having been unseen, even if its `last_seen_s`
@@ -203,12 +203,13 @@ that: each potential was matched against what existed *at the time*.
   bag that is what turned three re-sighted cans back into their original
   IDs.
 
-## Why lost targets are kept
+## Which lost targets are kept
 
 The tracker used to delete a confirmed target 30 s after it went lost
 (`remove_timeout_s`). That made the map forget anything out of view, so a
 can seen again after a loop got a new ID, and a deleted target was never
-saved. F36 removed the deletion and the parameter.
+saved. F36 removed the deletion, which made every false confirmation
+permanent. F37 brought deletion back, but only for **weak** lost targets.
 
 ```python
 for t in self.confirmed:
@@ -216,14 +217,35 @@ for t in self.confirmed:
         t.is_lost = True
     elif t.is_lost:
         t.is_lost = False
-# Confirmed targets are never deleted (F36): lost is a status, not removal.
+# A lost target with little evidence is likely a false confirmation (F37).
+self.confirmed = [
+    t
+    for t in self.confirmed
+    if not t.is_lost or t.observation_count >= self.config.min_keep_obs
+]
+```
+
+```mermaid
+flowchart LR
+    V[confirmed, in view] -->|unseen > lost_timeout_s| Q{observation_count<br/>>= min_keep_obs?}
+    Q -->|yes| K[kept, lost:<br/>published, saved]
+    Q -->|no| X[deleted]
+    K -->|re-seen| V
 ```
 
 - **Association already considers lost targets**, so keeping them is all it
   takes for a re-sighting within the class's `drift_tolerance_m` to resume
   the old ID.
-- **The trade-off**: a false confirmation is now permanent for the session.
-  There is no removal on negative evidence (in view but not detected) yet.
+- **The count that matters is the one at the moment of going lost**, not
+  the final one. Short false bursts go lost under ~40 obs; real cans had at
+  least 58 on the recorded runs, so `min_keep_obs` is 40.
+- **Trade-offs**: a real object seen only briefly is forgotten and
+  re-confirms under a new ID. A *steady* false detection (the same wrong
+  label for minutes) still builds enough evidence to be kept; a count can't
+  tell it apart from a real object, so that fix belongs in `dome_vision`.
+- **Saved maps need no migration**: restored targets carry their old
+  `last_seen_s`, so the first `expire` marks them lost and drops the weak
+  ones.
 
 ## Recovering from a "false split"
 

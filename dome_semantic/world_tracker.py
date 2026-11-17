@@ -23,8 +23,9 @@ from dome_semantic.tracker_config import WorldTrackerConfig
 
 class WorldTracker:
     """Two-tier state machine: PotentialTarget accumulates evidence, ConfirmedTarget holds
-    reliable estimates. Confirmed targets are kept, marked lost, while out of view, and
-    persist across sessions via to_json/from_json. Association is label-constrained so cups never absorb cans.
+    reliable estimates. A confirmed target out of view is marked lost: kept if it had
+    at least min_keep_obs observations, else deleted as a likely false confirmation.
+    Targets persist across sessions via to_json/from_json. Association is label-constrained so cups never absorb cans.
     """
 
     def __init__(self, config: WorldTrackerConfig):
@@ -248,7 +249,12 @@ class WorldTracker:
                 t.is_lost = True
             elif t.is_lost:
                 t.is_lost = False
-        # Confirmed targets are never deleted (F36): lost is a status, not removal.
+        # A lost target with little evidence is likely a false confirmation (F37).
+        self.confirmed = [
+            t
+            for t in self.confirmed
+            if not t.is_lost or t.observation_count >= self.config.min_keep_obs
+        ]
         self.potentials = [
             p
             for p in self.potentials

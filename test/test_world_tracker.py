@@ -31,6 +31,7 @@ def fast_cfg(**kwargs):
         "min_frames": 2,
         "min_time_s": 0.1,
         "lost_timeout_s": 2.0,
+        "min_keep_obs": 0,
     }
     defaults.update(kwargs)
     return WorldTrackerConfig(**defaults)
@@ -163,6 +164,66 @@ def test_lost_confirmed_target_kept_and_saved():
     assert len(tracker.confirmed_targets) == 1
     assert tracker.confirmed_targets[0].is_lost is True
     assert [e["label"] for e in json.loads(tracker.to_json())] == ["cup"]
+
+
+# --- F37: forget weak lost targets ---
+
+
+def confirmed_with_obs(n_obs: int, **kwargs) -> WorldTracker:
+    """A tracker holding one confirmed cup seen n_obs times, min_keep_obs 4."""
+    tracker = WorldTracker(fast_cfg(lost_timeout_s=1.0, min_keep_obs=4, **kwargs))
+    feed(tracker, (1.0, 0.0, 0.0), "cup", n_frames=n_obs, dt=0.2)
+    assert tracker.confirmed_targets[0].observation_count == n_obs
+    return tracker
+
+
+def test_weak_target_forgotten_when_lost():
+    tracker = confirmed_with_obs(3)
+    tracker.update([], 10.0)
+    assert tracker.confirmed_targets == []
+
+
+def test_target_at_threshold_kept_when_lost():
+    tracker = confirmed_with_obs(4)
+    tracker.update([], 10.0)
+    assert len(tracker.confirmed_targets) == 1
+    assert tracker.confirmed_targets[0].is_lost is True
+
+
+def test_weak_target_kept_while_seen():
+    tracker = confirmed_with_obs(3)
+    tracker.update([], 0.5)
+    assert len(tracker.confirmed_targets) == 1
+    assert tracker.confirmed_targets[0].is_lost is False
+
+
+def test_strong_lost_target_reseen_keeps_id():
+    tracker = confirmed_with_obs(4)
+    original_id = tracker.confirmed_targets[0].target_id
+    tracker.update([], 10.0)
+    tracker.update([obs((1.0, 0.0, 0.0), "cup")], 10.5)
+    assert [t.target_id for t in tracker.confirmed_targets] == [original_id]
+    assert tracker.confirmed_targets[0].is_lost is False
+
+
+# Accepted trade-off: a forgotten real object re-confirms under a new ID.
+def test_forgotten_target_reseen_gets_new_id():
+    tracker = confirmed_with_obs(3)
+    original_id = tracker.confirmed_targets[0].target_id
+    tracker.update([], 10.0)
+    feed(tracker, (1.0, 0.0, 0.0), "cup", n_frames=3, start_t=11.0, dt=0.2)
+    assert len(tracker.confirmed_targets) == 1
+    assert tracker.confirmed_targets[0].target_id != original_id
+
+
+# Saved maps from before F37 need no migration: weak targets drop on first update.
+def test_restored_weak_targets_dropped_on_first_update():
+    tracker = confirmed_with_obs(4)
+    feed(tracker, (3.0, 0.0, 0.0), "can", n_frames=3, start_t=1.0, dt=0.2)
+    restored = WorldTracker.from_json(tracker.to_json(), tracker.config)
+    assert len(restored.confirmed_targets) == 2
+    restored.update([], 100.0)
+    assert [t.label for t in restored.confirmed_targets] == ["cup"]
 
 
 def test_stale_potential_removed():
@@ -673,6 +734,7 @@ def fsr_cfg(**kwargs):
         "lost_timeout_s": 1.0,
         "enable_false_split_recovery": True,
         "false_split_lookback_s": 5.0,
+        "min_keep_obs": 0,
     }
     defaults.update(kwargs)
     return WorldTrackerConfig(**defaults)
@@ -715,6 +777,7 @@ def test_false_split_incompatible_size_no_recovery():
             enable_false_split_recovery=True,
             false_split_lookback_s=5.0,
             size_confidence_floor=0.5,
+            min_keep_obs=0,
         )
     )
     small_size = SizeEstimate(

@@ -31,11 +31,13 @@ strategies in `association.py`:
 
 **Baseline association** (always active): `max_assoc_dist_m`,
 `confirmed_assoc_mult`, `min_frames`, `min_time_s`, `lost_timeout_s`,
-`require_anchor` — the core confirm/lose lifecycle every target goes
-through regardless of any other feature being enabled. There is **no
-forget step**: `remove_timeout_s` was removed by F36, so a confirmed target
-is marked lost after `lost_timeout_s` and kept. The same timeout drops
-stale potentials.
+`require_anchor`, `min_keep_obs` — the core confirm/lose lifecycle every
+target goes through regardless of any other feature being enabled. A
+confirmed target is marked lost after `lost_timeout_s`. There is no
+forget-after-a-while timer (`remove_timeout_s` was removed by F36); instead,
+a target that goes lost with fewer than `min_keep_obs` observations is
+deleted at once (F37), and the rest are kept. The same timeout drops stale
+potentials.
 
 **F38 PASA association** (opt-in via `use_class_profiles`): everything
 prefixed `assoc_cost_*`, plus `class_profile_path` /

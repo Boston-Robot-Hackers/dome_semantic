@@ -19,6 +19,7 @@ def pasa_cfg(**kwargs):
         "assoc_cost_track_hint_weight": 0.3,
         "enable_false_split_recovery": True,
         "false_split_lookback_s": 5.0,
+        "min_keep_obs": 0,
     }
     defaults.update(kwargs)
     return WorldTrackerConfig(**defaults)

@@ -6,6 +6,7 @@
 
 /**:
   ros__parameters:
+    min_keep_obs: 40                    # lost targets with fewer obs are deleted (F37, TF37.0)
     use_class_profiles: true            # enable PASA: per-class size priors and label normalisation
     assoc_cost_distance_weight: 1.0
     assoc_cost_size_weight: 0.0         # 0 = disabled until depth quality is verified
