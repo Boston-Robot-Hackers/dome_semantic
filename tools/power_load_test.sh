@@ -187,7 +187,7 @@ start_stage() {
             launch_stage "$1" env PYTHONUNBUFFERED=1 ros2 topic hz /oak/detections_3d
             ;;
         semantic)
-            launch_stage "$1" bl dome_semantic semantic.launch.py \
+            launch_stage "$1" bl dome_semantic robot.launch.py \
                 --map_name power_test --static_map_odom true
             ;;
         *) die "no such stage: $1" ;;

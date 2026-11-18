@@ -83,9 +83,16 @@ at 20:54:54; the node ran to 20:56:53 and saved `mon09.json`.
 - Adapt the kit's `uv`-based hook and `/checkpoint` to this repo, or
   install `uv` (not yet decided).
 
+### Open issues
+
+- **I01**: range noise makes duplicate targets along one line of sight
+  (2026-11-17, two cans at ~5 m became five targets). Waits on
+  `dome_vision` I04.
+
 ### Open issues, in other packages
 
-- **`dome_vision`** I04 (depth error on small objects at ~2 m), I05
+- **`dome_vision`** I04 (depth error on small objects at ~2 m, recurred at
+  ~5 m on 2026-11-17), I05
   (can/cup double label, steady false cups).
 - **`dome_nav`** I13 (real params not migrated to Kilted: `/cmd_vel` type
   mismatch, `bt_navigator` crash). **Nav2 navigation is down** until fixed;

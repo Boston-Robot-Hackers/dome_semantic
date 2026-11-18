@@ -39,7 +39,7 @@ src/dome_semantic/tools/power_load_test.sh --hold 60  # longer stages
 | `cpu` | `stress-ng --cpu 4`, stopped when the stage ends |
 | `oak` | `bl dome_vision_ros dome_vision_ros.launch.py --config "$DOME_VISION_CONFIG" --depth true` |
 | `subscriber` | `ros2 topic hz /oak/detections_3d`; without a subscriber the node never runs inference |
-| `semantic` | `bl dome_semantic semantic.launch.py --map_name power_test --static_map_odom true` |
+| `semantic` | `bl dome_semantic robot.launch.py --map_name power_test --static_map_odom true` |
 | `worst_case` | `stress-ng --cpu 4` again, with everything running |
 
 **What you see**: a banner per stage, kernel voltage and USB events as they

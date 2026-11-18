@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-# test_semantic_launch — semantic.launch.py wiring, checked against a fake BetterLaunch
+# test_robot_launch — robot.launch.py wiring, checked against a fake BetterLaunch
 # Author: Pito Salas and Claude Code
+# Version: 1
+# Created: 2026-11-18
+# Updated: 2026-11-18
 # Open Source Under MIT license
 
 """Runs the launch function against a fake BetterLaunch, so no process starts.
@@ -17,7 +20,7 @@ from unittest.mock import MagicMock
 import pytest
 from better_launch.utils.click import DeclaredArg, get_click_options
 
-LAUNCH_FILE = pathlib.Path(__file__).parent.parent / "launch" / "semantic.launch.py"
+LAUNCH_FILE = pathlib.Path(__file__).parent.parent / "launch" / "robot.launch.py"
 CONFIG_DIR = pathlib.Path(__file__).parent.parent / "config"
 
 
@@ -30,13 +33,13 @@ def find_in_source_config(package: str, filename: str) -> str:
 
 def load_launch_function(fake_bl: MagicMock | None = None):
     src = LAUNCH_FILE.read_text().replace("@launch_this(ui=True)", "")
-    spec = importlib.util.spec_from_loader("semantic_launch_file", loader=None)
+    spec = importlib.util.spec_from_loader("robot_launch_file", loader=None)
     module = importlib.util.module_from_spec(spec)
     # Launch files are scripts, not importable modules.
     exec(compile(src, str(LAUNCH_FILE), "exec"), module.__dict__)  # noqa: S102
     if fake_bl is not None:
         module.__dict__["BetterLaunch"] = fake_bl
-    return module.__dict__["semantic_launch"]
+    return module.__dict__["robot_launch"]
 
 
 def launched_nodes(**launch_args) -> dict[str, dict]:

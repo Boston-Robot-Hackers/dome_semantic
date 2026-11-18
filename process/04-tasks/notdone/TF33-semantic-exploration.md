@@ -85,7 +85,7 @@ Check: `ros2 run tf2_ros tf2_echo map camera_link` — not in `ros2diag`'s
 
 **4. dome_semantic node** (TF33.8 Part A launch; `--static_map_odom true`
 replaces step 3's static TF when skipping SLAM):
-`bl dome_semantic semantic.launch.py --map_name <name> --publish_every_n 5`
+`bl dome_semantic robot.launch.py --map_name <name> --publish_every_n 5`
 Check: `ros2 topic hz /semantic/targets`, `/targets/markers`; `ros2 topic
 echo /semantic/targets` for content; `/targets/assoc_diag` if
 `use_class_profiles` is on.
@@ -99,7 +99,7 @@ Steps 1, 2 and 3 (real SLAM, not the static TF), then step 4 **without**
 `--static_map_odom`, from `~/ros2_ws`:
 
 ```
-bl dome_semantic semantic.launch.py --map_name f33slam --publish_every_n 5
+bl dome_semantic robot.launch.py --map_name f33slam --publish_every_n 5
 ```
 
 Checks (run `topic hz` in the background and stop it with

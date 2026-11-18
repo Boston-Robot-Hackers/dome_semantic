@@ -1,25 +1,29 @@
 ---
-version: "1.2"
-generated: "2026-11-13"
+version: "1.3"
+generated: "2026-11-18"
 ---
 
-# `semantic.launch.py` — One Command for the Semantic Node
+# `robot.launch.py` — One Command for the Semantic Node
 
 ## What it does
 
-`semantic.launch.py` starts `semantic_map_node` (chapter 13) and, if asked,
-an identity `map→odom` static transform. It is the first launch file in this
-package; before it, every hardware run took a bare `ros2 run` with `-p`
+`robot.launch.py` starts `semantic_map_node` (chapter 13) and, if asked,
+an identity `map→odom` static transform. It was called `semantic.launch.py`
+until F05 renamed every package's launch file to `robot.launch.py` or
+`remote.launch.py` (dome2's `stack/launch_conventions.md`). It is the only
+launch file in this package; before it, every hardware run took a bare `ros2 run` with `-p`
 flags, typed from the right directory, plus a separate terminal for the
 static transform.
 
-It is deliberately **node-only**: no OAK-D, no SLAM, no Nav2. The full
-perception + SLAM + explore stack (TF33.8 Part B) is meant to *include* this
-file rather than duplicate its node definition.
+It is deliberately **node-only**: no OAK-D, no SLAM, no Nav2. That is the
+*two-level rule*: a package's launch file starts only that package's nodes,
+and only dome2 combines packages. The full perception + SLAM + explore stack
+(TF33.8 Part B) is meant to *include* this file rather than duplicate its
+node definition.
 
 ```mermaid
 flowchart LR
-    ARGS["--map_name<br/>--publish_every_n<br/>--static_map_odom"] --> LF[semantic_launch]
+    ARGS["--map_name<br/>--publish_every_n<br/>--static_map_odom"] --> LF[robot_launch]
     LF -->|always| NODE[semantic_map_node<br/>name: semantic_map]
     LF -->|only if static_map_odom| STF[static_transform_publisher<br/>map → odom, identity]
 ```
@@ -32,7 +36,7 @@ parameters *are* the launch arguments:
 
 ```python
 @launch_this(ui=True)
-def semantic_launch(
+def robot_launch(
     map_name: str = "",
     publish_every_n: int = 5,
     static_map_odom: bool = False,
@@ -40,7 +44,7 @@ def semantic_launch(
 ```
 
 better_launch turns each parameter into a `click` option, using the type
-annotation as the option's type. So `bl dome_semantic semantic.launch.py
+annotation as the option's type. So `bl dome_semantic robot.launch.py
 --help` lists `--map_name TEXT`, `--publish_every_n INTEGER` and
 `--static_map_odom BOOLEAN` without any `DeclareLaunchArgument` boilerplate.
 
@@ -61,7 +65,7 @@ So the launch file refuses to start without it, the same convention
 ```python
 if not map_name:
     raise ValueError(
-        "map_name is required: bl dome_semantic semantic.launch.py --map_name <name>"
+        "map_name is required: bl dome_semantic robot.launch.py --map_name <name>"
     )
 ```
 
@@ -140,7 +144,7 @@ field.
 ## Testing
 
 `@launch_this` *runs* the launch as soon as the module is executed, so
-`test/test_semantic_launch.py` strips the decorator from the source, `exec`s
+`test/test_robot_launch.py` strips the decorator from the source, `exec`s
 it, and swaps in a `MagicMock` for `BetterLaunch`. Calling the function then
 records `bl.node(...)` calls instead of starting processes. The tests check:
 

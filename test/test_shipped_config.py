@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # test_shipped_config — the robot's config/ files load and actually turn PASA on
 # Author: Pito Salas and Claude Code
+# Version: 1
+# Created: 2026-11-18
+# Updated: 2026-11-18
 # Open Source Under MIT license
 
 """Checks config/semantic_map.yaml and config/class_profiles.yaml, the files
-semantic.launch.py hands the node.
+robot.launch.py hands the node.
 
 Without them the node runs at WorldTrackerConfig defaults (PASA off), which is
 the bug F34 fixes, so these tests guard both the files and the behaviour they
