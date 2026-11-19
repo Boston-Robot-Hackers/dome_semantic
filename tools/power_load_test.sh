@@ -111,8 +111,6 @@ preflight() {
     for cmd in vcgencmd bl ros2 stress-ng journalctl lsusb ping pgrep; do
         command -v "$cmd" >/dev/null || die "$cmd not found"
     done
-    [[ -n ${DOME_VISION_CONFIG:-} && -f $DOME_VISION_CONFIG ]] ||
-        die "DOME_VISION_CONFIG must name the dome_vision config file"
     vcgencmd pmic_read_adc EXT5V_V | grep -q EXT5V_V ||
         die "vcgencmd can't read EXT5V_V"
     lsusb | grep -q "ID 03e7:" || die "the OAK-D (USB ID 03e7) isn't on USB"
@@ -180,8 +178,7 @@ start_stage() {
         base) launch_stage "$1" bl dome2 robot.launch.py --options "d b" ;;
         cpu | worst_case) launch_stage "$1" stress-ng --cpu 4 ;;
         oak)
-            launch_stage "$1" bl dome_vision_ros dome_vision_ros.launch.py \
-                --config "$DOME_VISION_CONFIG" --depth true
+            launch_stage "$1" bl dome_vision_ros robot.launch.py --depth true
             ;;
         subscriber)
             launch_stage "$1" env PYTHONUNBUFFERED=1 ros2 topic hz /oak/detections_3d

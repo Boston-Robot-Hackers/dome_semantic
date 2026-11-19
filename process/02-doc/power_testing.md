@@ -37,7 +37,7 @@ src/dome_semantic/tools/power_load_test.sh --hold 60  # longer stages
 | `idle` | nothing: the baseline |
 | `base` | `bl dome2 robot.launch.py --options "d b"` (drivers + battery) |
 | `cpu` | `stress-ng --cpu 4`, stopped when the stage ends |
-| `oak` | `bl dome_vision_ros dome_vision_ros.launch.py --config "$DOME_VISION_CONFIG" --depth true` |
+| `oak` | `bl dome_vision_ros robot.launch.py --depth true` (since 2026-11-19; before that `dome_vision_ros.launch.py` with `publish_raw` on, so earlier `oak` baselines carried more load) |
 | `subscriber` | `ros2 topic hz /oak/detections_3d`; without a subscriber the node never runs inference |
 | `semantic` | `bl dome_semantic robot.launch.py --map_name power_test --static_map_odom true` |
 | `worst_case` | `stress-ng --cpu 4` again, with everything running |

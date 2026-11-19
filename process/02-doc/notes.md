@@ -94,7 +94,7 @@ name; bags already on the robot are `f36drive`, `f36replay_*`, `f36run`,
 ```
 bl dome2 robot.launch.py --options "d b"
 bl dome_nav robot_map.launch.py --map_name <name>
-bl dome_vision_ros dome_vision_ros.launch.py --config "$DOME_VISION_CONFIG" --depth true
+bl dome_vision_ros robot.launch.py --depth true
 bl dome_semantic robot.launch.py --map_name <name>
 ros2 bag record -o ~/bags/<name> /tf /tf_static /oak/detections_3d /odom /scan /semantic/targets
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
@@ -127,7 +127,7 @@ From `~/ros2_ws`:
 src/dome_semantic/tools/power_load_test.sh [--hold 60]
 src/dome_semantic/tools/power_load_test.sh --report ~/power_tests/<run>
 bl dome2 robot.launch.py --options "d b"          # drivers + battery
-bl dome_vision_ros dome_vision_ros.launch.py --config "$DOME_VISION_CONFIG" --depth true
+bl dome_vision_ros robot.launch.py --depth true
 bl dome_semantic robot.launch.py --map_name <name> [--static_map_odom true]
 ```
 

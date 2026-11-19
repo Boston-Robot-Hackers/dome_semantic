@@ -61,11 +61,9 @@ telemetry is its own subsystem now)
 
 **2. OAK-D detection only** — do **not** use `--options vision` (that also
 starts `dome_vision_ros`'s legacy `semantic_map_node`, the one F33 replaces):
-`bl dome_vision_ros dome_vision_ros.launch.py --config
-"$DOME_VISION_CONFIG" --depth true` (`.bashrc` already exports
-`DOME_VISION_CONFIG` to the right path; no default `--config`, and the node
-resolves a relative one against the launching shell's cwd, not the workspace
-root, so a literal relative path breaks depending on where you run it from).
+`bl dome_vision_ros robot.launch.py` (since 2026-11-19 it uses the installed
+`roboflow_oak.yaml` by default, with depth on; `dome_vision_ros.launch.py`
+was deleted in dome2 F05).
 Also requires `ROBOFLOW_API_KEY` exported in the shell (not persisted
 anywhere — the yaml refuses to expand it if unset). Gotcha: the node only
 publishes `/oak/detections_3d` once something has subscribed
